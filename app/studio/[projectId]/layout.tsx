@@ -16,11 +16,11 @@ export default function StudioLayout({
   const [activeTab, setActiveTab] = useState<"view" | "ai" | "files" | "map">("view");
 
   return (
-    // The Root: Locked to the viewport, no scrolling on this layer
-    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden">
+    /* OUTER WRAPPER: Forced grid structure */
+    <div className="fixed inset-0 bg-black grid grid-rows-[80px_1fr_96px] overflow-hidden">
       
-      {/* 1. TOP HEADER: Rigid height, non-negotiable space */}
-      <header className="h-20 w-full shrink-0 border-b border-white/5 flex flex-col justify-center px-6 bg-black z-[100]">
+      {/* 1. TOP HEADER: Row 1 */}
+      <header className="w-full border-b border-white/5 flex flex-col justify-center px-6 bg-black z-[100]">
         <h1 className="text-lg font-bold text-white tracking-tight leading-none mb-1">
           Project Alpha
         </h1>
@@ -29,42 +29,45 @@ export default function StudioLayout({
         </p>
       </header>
 
-      {/* 2. THE WORKSPACE: This is the ONLY area that can contain panels */}
-      <main className="relative flex-1 w-full bg-black overflow-hidden">
+      {/* 2. THE MAIN WORKSPACE: Row 2 (Flexible Middle) */}
+      <main className="relative w-full h-full overflow-hidden bg-black">
         
-        {/* VIEW PANEL: Occupies the middle ground exactly */}
+        {/* VIEW PANEL */}
         <div className={cn(
-          "absolute inset-0 z-0 overflow-y-auto transition-opacity duration-300", 
-          activeTab === "view" ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          "absolute inset-0 z-10 transition-opacity duration-300", 
+          activeTab === "view" ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
         )}>
-          {children}
+          {/* Internal scroll for content */}
+          <div className="h-full w-full overflow-y-auto">
+            {children}
+          </div>
         </div>
 
-        {/* AI PANEL: Bound by the main container's edges */}
+        {/* AI PANEL: Bound strictly by Main boundaries */}
         <div className={cn(
-          "absolute inset-0 z-20 bg-zinc-950 transition-all duration-500 ease-in-out", 
+          "absolute inset-0 z-20 bg-black transition-all duration-500 ease-out", 
           activeTab === "ai" ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
         )}>
            <ChatInterface />
         </div>
 
-        {/* FILES PANEL: Bound by the main container's edges */}
+        {/* FILES PANEL: Bound strictly by Main boundaries */}
         <div className={cn(
-          "absolute inset-0 z-30 bg-zinc-950 transition-all duration-500 ease-in-out", 
+          "absolute inset-0 z-30 bg-black transition-all duration-500 ease-out", 
           activeTab === "files" ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
         )}>
            <FileExplorer />
         </div>
       </main>
 
-      {/* 3. BOTTOM DOCK AREA: Fixed height at the very bottom */}
-      <div className="h-24 w-full shrink-0 bg-black border-t border-white/5 z-[100] relative">
+      {/* 3. BOTTOM DOCK AREA: Row 3 */}
+      <footer className="w-full bg-black border-t border-white/5 flex items-center justify-center relative z-[100]">
         <BottomDock activeTab={activeTab} setActiveTab={setActiveTab} />
-      </div>
+      </footer>
 
-      {/* Ambient Visuals (Absolute background) */}
-      <div className="fixed inset-0 pointer-events-none z-[-1]">
-         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_50%)]" />
+      {/* Global Background Glow */}
+      <div className="fixed inset-0 pointer-events-none z-[-1] opacity-20">
+         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-primary/20 blur-[150px] rounded-full" />
       </div>
     </div>
   );
