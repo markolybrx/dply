@@ -5,6 +5,7 @@ import { BottomDock } from "@/components/mobile-studio/BottomDock";
 import { ChatInterface } from "@/components/mobile-studio/ChatInterface";
 import { FileExplorer } from "@/components/mobile-studio/FileExplorer";
 import { cn } from "@/lib/utils";
+import { LogicMap } from "@/components/mobile-studio/LogicMap";
 
 export default function StudioLayout({
   children,
@@ -59,6 +60,14 @@ export default function StudioLayout({
            <div className="flex-1 overflow-hidden">
              <FileExplorer />
            </div>
+        </div>
+
+ {/* Layer 4: Logic Map */}
+        <div className={cn(
+          "absolute inset-0 z-40 bg-black transition-all duration-500 ease-out", 
+          activeTab === "map" ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
+        )}>
+           <LogicMap />
         </div>
       </main>
 
