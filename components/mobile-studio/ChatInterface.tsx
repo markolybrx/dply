@@ -67,12 +67,12 @@ export const ChatInterface = () => {
   };
 
   return (
-    /* CRITICAL: We use flex-col and h-full. 
-       This container will now exactly match the 'Row 2' height defined in your layout. 
+    /* STACKED BOX COMPONENT: 
+       Takes 100% of parent (Middle Box) and prevents content leaks. 
     */
     <div className="flex flex-col h-full w-full bg-black overflow-hidden">
 
-      {/* 1. Messages Area: Scrollable, takes all available space above the input */}
+      {/* 1. Message Box: Fills available space, scrolls internally */}
       <div className="flex-1 overflow-y-auto px-4 pt-6 pb-4 space-y-6 no-scrollbar">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-zinc-700 space-y-4 opacity-40">
@@ -100,8 +100,8 @@ export const ChatInterface = () => {
         <div ref={messagesEndRef} className="h-4" />
       </div>
 
-      {/* 2. Input Area: Solid footer for the chat panel */}
-      <div className="shrink-0 p-4 border-t border-white/5 bg-black/40 backdrop-blur-md">
+      {/* 2. Input Box: Sits at the bottom of the Middle Box */}
+      <div className="shrink-0 p-4 border-t border-white/5 bg-zinc-950/50 backdrop-blur-md">
         <div className="relative flex items-center bg-zinc-900/90 border border-white/10 rounded-2xl p-1.5 shadow-xl">
           <input
             type="text"
