@@ -70,7 +70,7 @@ export const ChatInterface = () => {
     /* CRITICAL: We use flex-col and h-full. 
        This container will now exactly match the 'Row 2' height defined in your layout. 
     */
-    <div className="flex flex-col h-full w-full bg-zinc-950 overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-black overflow-hidden">
 
       {/* 1. Messages Area: Scrollable, takes all available space above the input */}
       <div className="flex-1 overflow-y-auto px-4 pt-6 pb-4 space-y-6 no-scrollbar">
