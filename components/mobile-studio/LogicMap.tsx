@@ -2,80 +2,109 @@
 
 import React, { useState } from "react";
 import { useFileStore } from "@/store/useFileStore";
-import { Move, Link as LinkIcon, Share2 } from "lucide-react";
+import { Move, Link2, Layout, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const LogicMap = () => {
   const { files, updateFilePosition } = useFileStore();
-  
-  // Local state to track which page is being dragged
   const [dragging, setDragging] = useState<string | null>(null);
 
+  // Simple drag logic for mobile and desktop
   const handleDrag = (e: React.MouseEvent | React.TouchEvent, fileName: string) => {
     if (dragging !== fileName) return;
     
-    // Get coordinates from Mouse or Touch
-    const x = 'clientX' in e ? e.clientX : e.touches[0].clientX;
-    const y = 'clientY' in e ? e.clientY : e.touches[0].clientY;
+    const clientX = 'clientX' in e ? e.clientX : e.touches[0].clientX;
+    const clientY = 'clientY' in e ? e.clientY : e.touches[0].clientY;
     
-    // Adjusting for header (80px) and offset
-    updateFilePosition(fileName, x - 50, y - 120);
+    // We adjust for the 80px header offset
+    updateFilePosition(fileName, clientX - 80, clientY - 140);
   };
 
   return (
     <div 
-      className="w-full h-full bg-zinc-950 relative overflow-hidden"
+      className="w-full h-full bg-zinc-950 relative overflow-hidden select-none"
       onMouseMove={(e) => dragging && handleDrag(e, dragging)}
       onMouseUp={() => setDragging(null)}
+      onTouchMove={(e) => dragging && handleDrag(e, dragging)}
+      onTouchEnd={() => setDragging(null)}
     >
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10" 
-           style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+      {/* 1. Designer Grid Background */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+        style={{ 
+          backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', 
+          backgroundSize: '30px 30px' 
+        }} 
+      />
 
+      {/* 2. Map HUD Overlay */}
       <div className="absolute top-6 left-6 z-10">
-        <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md border border-white/5 px-4 py-2 rounded-full">
-          <Share2 className="w-3 h-3 text-primary" />
-          <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Architect Mode</span>
+        <div className="flex items-center gap-3 bg-zinc-900/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-2xl shadow-2xl">
+          <Share2 className="w-3.5 h-3.5 text-primary animate-pulse" />
+          <span className="text-[10px] font-mono text-zinc-300 uppercase tracking-[0.2em]">
+            Logic Architect
+          </span>
         </div>
       </div>
 
-      {/* Page Nodes */}
-      {files.map((file, idx) => {
-        const pos = file.position || { x: 50 + idx * 100, y: 100 + idx * 50 };
-        
-        return (
-          <div
-            key={file.name}
-            style={{ left: pos.x, top: pos.y }}
-            className={cn(
-              "absolute w-40 p-3 rounded-2xl border bg-zinc-900 shadow-2xl cursor-grab active:cursor-grabbing transition-shadow",
-              dragging === file.name ? "border-primary shadow-primary/20 scale-105" : "border-white/10"
-            )}
-            onMouseDown={() => setDragging(file.name)}
-            onTouchStart={() => setDragging(file.name)}
-            onTouchEnd={() => setDragging(null)}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <Move className="w-3 h-3 text-zinc-600" />
-            </div>
+      {/* 3. Page Nodes (The draggable previews) */}
+      <div className="relative w-full h-full">
+        {files.map((file, idx) => {
+          // Fallback position if not yet set
+          const pos = file.position || { x: 40 + idx * 40, y: 80 + idx * 60 };
+          
+          return (
+            <div
+              key={file.name}
+              style={{ left: pos.x, top: pos.y }}
+              className={cn(
+                "absolute w-44 bg-zinc-900 rounded-2xl border transition-all duration-75 shadow-2xl overflow-hidden",
+                dragging === file.name 
+                  ? "border-primary scale-105 shadow-primary/20 z-50 ring-4 ring-primary/5" 
+                  : "border-white/5 z-10"
+              )}
+            >
+              {/* Header / Drag Handle */}
+              <div 
+                className="p-3 bg-white/5 flex items-center justify-between cursor-grab active:cursor-grabbing"
+                onMouseDown={() => setDragging(file.name)}
+                onTouchStart={() => setDragging(file.name)}
+              >
+                <div className="flex items-center gap-2">
+                   <Layout className="w-3 h-3 text-zinc-500" />
+                   <span className="text-[9px] font-bold text-white truncate w-24 uppercase tracking-tighter">
+                      {file.name.split('/').pop()}
+                   </span>
+                </div>
+                <Move className="w-3 h-3 text-zinc-700" />
+              </div>
 
-            <p className="text-[10px] font-bold text-white truncate mb-1">{file.name.split('/').pop()}</p>
-            <p className="text-[8px] text-zinc-500 font-mono mb-3">{file.name}</p>
+              {/* Mini Preview Box (Simulated for now) */}
+              <div className="p-3">
+                 <div className="aspect-[4/3] w-full bg-black rounded-lg border border-white/5 p-2 flex flex-col gap-1 overflow-hidden opacity-60">
+                    <div className="h-1 w-1/2 bg-zinc-800 rounded-full" />
+                    <div className="h-1 w-3/4 bg-zinc-800 rounded-full" />
+                    <div className="mt-2 h-4 w-full bg-zinc-900 rounded-md" />
+                 </div>
+              </div>
 
-            {/* Mini Preview Mock */}
-            <div className="w-full h-20 bg-black rounded-lg border border-white/5 flex items-center justify-center">
-               <div className="w-8 h-1 bg-zinc-800 rounded-full" />
+              {/* Metadata Footer */}
+              <div className="px-3 pb-3 flex items-center justify-between">
+                 <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
+                 </div>
+                 <div className="flex items-center gap-1">
+                    <Link2 className="w-3 h-3 text-zinc-700" />
+                    <span className="text-[8px] font-mono text-zinc-600">
+                      {file.linksTo?.length || 0} links
+                    </span>
+                 </div>
+              </div>
             </div>
-
-            {/* Link Indicators */}
-            <div className="mt-3 pt-3 border-t border-white/5 flex gap-2">
-               <LinkIcon className="w-3 h-3 text-zinc-700" />
-               <div className="flex-1 h-1 bg-zinc-800 rounded-full mt-1" />
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };
