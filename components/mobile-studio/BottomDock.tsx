@@ -21,8 +21,11 @@ export const BottomDock = ({ activeTab, setActiveTab }: BottomDockProps) => {
   ];
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="flex items-center gap-2 px-2 py-2 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+    /* REMOVED 'fixed bottom-6'. 
+       The component now centers itself within the footer box of Box 3. 
+    */
+    <div className="flex items-center justify-center w-full h-full px-4">
+      <div className="flex items-center gap-1 p-1.5 bg-zinc-900/50 backdrop-blur-2xl border border-white/5 rounded-2xl shadow-2xl">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -30,29 +33,37 @@ export const BottomDock = ({ activeTab, setActiveTab }: BottomDockProps) => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as Tab)}
+              onClick={() => {
+                console.log("Switching to tab:", tab.id); // Debugging log
+                setActiveTab(tab.id as Tab);
+              }}
               className={cn(
-                "relative flex flex-col items-center justify-center w-14 h-14 rounded-xl transition-all duration-300",
-                isActive ? "text-white" : "text-zinc-500 hover:text-zinc-300"
+                "relative flex flex-col items-center justify-center w-16 h-14 rounded-xl transition-all duration-300",
+                isActive ? "text-white" : "text-zinc-500 hover:text-zinc-400"
               )}
             >
               {isActive && (
                 <motion.div
                   layoutId="active-pill"
-                  className="absolute inset-0 bg-white/10 rounded-xl"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  className="absolute inset-0 bg-white/5 rounded-xl border border-white/10"
+                  transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                 />
               )}
-              
+
               <Icon
                 className={cn(
-                  "w-6 h-6 transition-all duration-300",
-                  isActive && tab.id === "ai" ? "text-primary drop-shadow-[0_0_8px_rgba(217,70,239,0.8)]" : "",
-                  isActive && tab.id === "view" ? "text-secondary" : ""
+                  "w-5 h-5 transition-transform duration-300 mb-1",
+                  isActive ? "scale-110" : "scale-100",
+                  isActive && tab.id === "ai" ? "text-primary drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]" : ""
                 )}
               />
-              
-              <span className="text-[10px] font-medium mt-1">{tab.label}</span>
+
+              <span className={cn(
+                "text-[9px] font-bold uppercase tracking-tighter transition-opacity",
+                isActive ? "opacity-100" : "opacity-40"
+              )}>
+                {tab.label}
+              </span>
             </button>
           );
         })}
