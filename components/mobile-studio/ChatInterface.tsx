@@ -11,7 +11,6 @@ export const ChatInterface = () => {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -68,14 +67,21 @@ export const ChatInterface = () => {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-transparent">
+    /* CRITICAL: We use flex-col and h-full. 
+       This container will now exactly match the 'Row 2' height defined in your layout. 
+    */
+    <div className="flex flex-col h-full w-full bg-zinc-950 overflow-hidden">
 
-      {/* 1. Messages Area: flex-1 ensures it fills all space NOT taken by the input */}
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-4 no-scrollbar">
+      {/* 1. Messages Area: Scrollable, takes all available space above the input */}
+      <div className="flex-1 overflow-y-auto px-4 pt-6 pb-4 space-y-6 no-scrollbar">
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-4 opacity-50">
-            <Sparkles className="w-10 h-10" />
-            <p className="text-xs uppercase tracking-widest font-mono">Ready to build</p>
+          <div className="h-full flex flex-col items-center justify-center text-zinc-700 space-y-4 opacity-40">
+            <div className="p-4 rounded-full bg-zinc-900/50">
+              <Sparkles className="w-8 h-8" />
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.3em] font-mono text-center">
+              System Online <br/> Ready to build
+            </p>
           </div>
         )}
 
@@ -84,32 +90,32 @@ export const ChatInterface = () => {
         ))}
 
         {isLoading && (
-          <div className="flex items-center gap-2 text-primary text-xs ml-4 mt-2">
+          <div className="flex items-center gap-2 text-primary text-xs ml-4 py-2">
              <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
              <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.1s]" />
              <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.2s]" />
           </div>
         )}
 
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-4" />
       </div>
 
-      {/* 2. Input Area: Pins to the bottom of the flex container */}
-      <div className="p-4 bg-gradient-to-t from-zinc-950 to-transparent">
-        <div className="relative flex items-center bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-2">
+      {/* 2. Input Area: Solid footer for the chat panel */}
+      <div className="shrink-0 p-4 border-t border-white/5 bg-black/40 backdrop-blur-md">
+        <div className="relative flex items-center bg-zinc-900/90 border border-white/10 rounded-2xl p-1.5 shadow-xl">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             disabled={isLoading} 
-            placeholder={isLoading ? "AI is thinking..." : "Ask AI to change something..."}
+            placeholder={isLoading ? "AI is processing..." : "Ask AI to change something..."}
             className="flex-1 bg-transparent border-none outline-none text-white px-3 h-10 text-sm placeholder:text-zinc-600 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
             disabled={isLoading || !input.trim()}
-            className="w-10 h-10 bg-white text-black rounded-xl flex items-center justify-center disabled:opacity-50 active:scale-95 transition-all shadow-lg"
+            className="w-10 h-10 bg-white text-black rounded-xl flex items-center justify-center disabled:opacity-30 active:scale-95 transition-all"
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
