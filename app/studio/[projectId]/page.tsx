@@ -1,9 +1,16 @@
-export default function ProjectPage({ params }: { params: { projectId: string } }) {
+"use client";
+
+import React from "react";
+import { CodePreview } from "@/components/mobile-studio/CodePreview";
+
+export default function StudioPage() {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-zinc-500">
-      <p className="text-xs tracking-widest uppercase mb-2">Project ID</p>
-      <h1 className="text-2xl font-bold text-white">{params.projectId}</h1>
-      <p className="mt-4 text-sm">Waiting for AI input...</p>
+    <div className="w-full h-full bg-black">
+      {/* This component now acts as your live 'Screen'. 
+          It will automatically update whenever the AI sends an :::UPDATE::: command 
+          targeting 'app/page.tsx'.
+      */}
+      <CodePreview />
     </div>
   );
 }
