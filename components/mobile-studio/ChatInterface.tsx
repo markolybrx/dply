@@ -68,7 +68,7 @@ export const ChatInterface = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-transparent">
+    <div className="flex flex-col h-full w-full bg-transparent">
 
       {/* 1. Messages Area: flex-1 ensures it fills all space NOT taken by the input */}
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 space-y-4 no-scrollbar">
