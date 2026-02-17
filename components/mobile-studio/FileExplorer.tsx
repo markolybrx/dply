@@ -13,7 +13,7 @@ export const FileExplorer = () => {
        Uses h-full and w-full to fill exactly the 'Row 2' workspace.
        bg-zinc-950 provides a solid 'Matte Black' surface.
     */
-    <div className="flex flex-col h-full w-full bg-zinc-950 overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-black overflow-hidden">
 
       {/* 1. Header Section: Fixed height within the panel */}
       <div className="shrink-0 p-6 pb-2 border-b border-white/5">
