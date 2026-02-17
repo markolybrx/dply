@@ -10,7 +10,7 @@ export const FileExplorer = () => {
 
   return (
     // We use h-full and bg-transparent because the Layout provides the container
-    <div className="flex flex-col h-full bg-transparent p-6">
+    <div className="flex flex-col h-full w-full bg-transparent p-6">
       
       {/* 1. Header Section */}
       <div className="flex items-center gap-2 mb-6 px-1">
