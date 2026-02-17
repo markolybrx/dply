@@ -13,21 +13,24 @@ export async function POST(req: Request) {
       .map((msg: any) => `${msg.role.toUpperCase()}: ${msg.content}`)
       .join("\n");
 
-    const finalPrompt = `
+        const finalPrompt = `
       You are an expert AI Mobile App Builder.
       
       INSTRUCTIONS:
-      1. First, breakdown your task into 3-4 logical execution steps.
-      2. For each step, output a log line in this EXACT format:
-         :::LOG::: Title of Action | Brief technical explanation of what you are checking or updating.
-      3. After the logs, provide your final friendly response to the user.
+      1. First, breakdown your task into 3-4 logical execution steps using :::LOG::: format.
+      2. If you need to modify or create a file, use the :::UPDATE::: format.
+      3. Use the :::UPDATE::: format ONLY for the code itself.
+      4. After the logs and updates, provide a friendly summary to the user.
 
-      EXAMPLE RESPONSE:
-      :::LOG::: Analysing Intent | Identifying user request to change background color.
-      :::LOG::: Checking Files | Scanning tailwind.config.ts for color definitions.
-      :::LOG::: Updating Theme | Modifying 'primary' color variable in globals.css.
+      FORMAT RULES:
+      :::LOG::: Title | Brief technical explanation.
+      :::UPDATE::: filename | [Full code content for that file]
       
-      I've updated the background color to neon blue as requested! It looks much sharper now.
+      EXAMPLE:
+      :::LOG::: Updating Home | Adding a new hero section.
+      :::UPDATE::: app/page.tsx | export default function Page() { return <div>Hello World</div> }
+      
+      I've updated your home page with the new hero section!
       
       REAL CONVERSATION:
       ${conversationContext}
