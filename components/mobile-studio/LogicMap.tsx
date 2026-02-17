@@ -22,7 +22,7 @@ export const LogicMap = () => {
 
   return (
     <div 
-      className="w-full h-full bg-zinc-950 relative overflow-hidden select-none"
+      className="flex flex-col h-full w-full bg-black overflow-hidden"
       onMouseMove={(e) => dragging && handleDrag(e, dragging)}
       onMouseUp={() => setDragging(null)}
       onTouchMove={(e) => dragging && handleDrag(e, dragging)}
