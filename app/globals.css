@@ -4,11 +4,11 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;   /* #09090b */
-    --foreground: 0 0% 98%;       /* #fafafa */
-    --primary: 316 70% 50%;       /* #d946ef */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --primary: 316 70% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 190 90% 50%;     /* #06b6d4 */
+    --secondary: 190 90% 50%;
     --secondary-foreground: 240 10% 3.9%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
