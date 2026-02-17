@@ -9,14 +9,13 @@ export const FileExplorer = () => {
   const { files, activeFile, setActiveFile } = useFileStore();
 
   return (
-    /* THE GRID-READY CONTAINER:
-       Uses h-full and w-full to fill exactly the 'Row 2' workspace.
-       bg-zinc-950 provides a solid 'Matte Black' surface.
+    /* BOX 2 INTERNAL: 
+       Specifically contained to fill the workspace box.
     */
     <div className="flex flex-col h-full w-full bg-black overflow-hidden">
 
-      {/* 1. Header Section: Fixed height within the panel */}
-      <div className="shrink-0 p-6 pb-2 border-b border-white/5">
+      {/* Internal Header: Sits at the top of the 'Middle Box' */}
+      <div className="shrink-0 p-6 pb-4 border-b border-white/5 bg-zinc-950/50">
         <div className="flex items-center gap-2 px-1">
           <div className="p-2 rounded-lg bg-primary/10">
             <Folder className="w-4 h-4 text-primary" />
@@ -27,15 +26,15 @@ export const FileExplorer = () => {
         </div>
       </div>
 
-      {/* 2. Scrollable File List: flex-1 ensures it takes the remaining height */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
+      {/* Scrollable File List: Stays within the middle box boundaries */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar bg-black">
         {files.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full opacity-30 py-20">
             <div className="w-16 h-16 rounded-full border border-dashed border-zinc-700 flex items-center justify-center mb-4">
               <FileCode className="w-6 h-6 text-zinc-600" />
             </div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-              No Files Found
+            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 text-center">
+              No Files Found <br/> Describe your app to start
             </p>
           </div>
         ) : (
@@ -84,8 +83,8 @@ export const FileExplorer = () => {
             </button>
           ))
         )}
-        
-        {/* Bottom Spacer for smooth scrolling edge */}
+
+        {/* Bottom Spacer */}
         <div className="h-6" />
       </div>
     </div>
