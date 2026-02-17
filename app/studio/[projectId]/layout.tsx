@@ -4,8 +4,8 @@ import React, { useState } from "react";
 import { BottomDock } from "@/components/mobile-studio/BottomDock";
 import { ChatInterface } from "@/components/mobile-studio/ChatInterface";
 import { FileExplorer } from "@/components/mobile-studio/FileExplorer";
-import { cn } from "@/lib/utils";
 import { LogicMap } from "@/components/mobile-studio/LogicMap";
+import { cn } from "@/lib/utils";
 
 export default function StudioLayout({
   children,
@@ -17,11 +17,11 @@ export default function StudioLayout({
   const [activeTab, setActiveTab] = useState<"view" | "ai" | "files" | "map">("view");
 
   return (
-    // ROOT: A strict grid that splits the screen into Header, Workspace, and Dock.
-    <div className="fixed inset-0 bg-black grid grid-rows-[80px_1fr_96px] overflow-hidden w-full h-full">
+    // ROOT: Forced to fill the visual viewport exactly
+    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden w-full h-full">
       
-      {/* ROW 1: HEADER (Strictly 80px) */}
-      <header className="w-full border-b border-white/5 flex flex-col justify-center px-6 bg-black z-[100] overflow-hidden">
+      {/* 1. HEADER: Highest Z-Index (100) - Always visible */}
+      <header className="h-20 w-full shrink-0 border-b border-white/5 flex flex-col justify-center px-6 bg-black z-[100] relative">
         <h1 className="text-lg font-bold text-white tracking-tight leading-none mb-1">
           Project Alpha
         </h1>
@@ -30,39 +30,34 @@ export default function StudioLayout({
         </p>
       </header>
 
-      {/* ROW 2: WORKSPACE (Takes all remaining space between Header and Dock) */}
-      <main className="relative w-full h-full overflow-hidden bg-black">
+      {/* 2. THE WORKSPACE: The only area where panels can move */}
+      <main className="relative flex-1 w-full bg-black overflow-hidden">
         
         {/* Layer: View (App Content) */}
         <div className={cn(
-          "absolute inset-0 z-10 transition-opacity duration-300 overflow-y-auto", 
+          "absolute inset-0 z-10 transition-opacity duration-300", 
           activeTab === "view" ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
         )}>
           {children}
         </div>
 
-        {/* Layer: AI Panel (Slides up from the bottom of Row 2) */}
+        {/* Layer: AI Panel (Slides up but stops at header) */}
         <div className={cn(
-          "absolute inset-0 z-20 bg-black transition-all duration-500 ease-out flex flex-col", 
+          "absolute inset-0 z-20 bg-black transition-all duration-500 ease-out", 
           activeTab === "ai" ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
         )}>
-           {/* We wrap the component to ensure it stretches to full height of Row 2 */}
-           <div className="flex-1 overflow-hidden">
-             <ChatInterface />
-           </div>
+           <ChatInterface />
         </div>
 
-        {/* Layer: Files Panel (Slides up from the bottom of Row 2) */}
+        {/* Layer: Files Panel */}
         <div className={cn(
-          "absolute inset-0 z-30 bg-black transition-all duration-500 ease-out flex flex-col", 
+          "absolute inset-0 z-30 bg-black transition-all duration-500 ease-out", 
           activeTab === "files" ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
         )}>
-           <div className="flex-1 overflow-hidden">
-             <FileExplorer />
-           </div>
+           <FileExplorer />
         </div>
 
- {/* Layer 4: Logic Map */}
+        {/* Layer: Logic Map */}
         <div className={cn(
           "absolute inset-0 z-40 bg-black transition-all duration-500 ease-out", 
           activeTab === "map" ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
@@ -71,8 +66,8 @@ export default function StudioLayout({
         </div>
       </main>
 
-      {/* ROW 3: DOCK (Strictly 96px) */}
-      <footer className="w-full bg-black border-t border-white/5 flex items-center justify-center z-[100] overflow-hidden">
+      {/* 3. DOCK AREA: Fixed Height at bottom */}
+      <footer className="h-24 w-full shrink-0 bg-black border-t border-white/5 z-[100] relative">
         <BottomDock activeTab={activeTab} setActiveTab={setActiveTab} />
       </footer>
     </div>
