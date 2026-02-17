@@ -4,21 +4,16 @@
 
 @layer base {
   :root {
-    /* Zinc 950 Base */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    
-    /* Neon Pink */
-    --primary: 316 70% 50%;
-    --primary-foreground: 0 0% 100%;
-    
-    /* Neon Blue */
-    --secondary: 190 90% 50%;
-    --secondary-foreground: 240 10% 3.9%;
-    
-    /* Surface Colors */
+    --background: 240 10% 3.9%;   /* Black */
+    --foreground: 0 0% 98%;       /* White */
     --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 316 70% 50%;       /* Neon Pink */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 190 90% 50%;     /* Neon Blue */
+    --secondary-foreground: 240 10% 3.9%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
     --accent: 240 3.7% 15.9%;
@@ -27,8 +22,8 @@
     --destructive-foreground: 0 0% 98%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 316 70% 50%;
-    --radius: 0.75rem;
+    --ring: 240 4.9% 83.9%;
+    --radius: 0.5rem;
   }
 }
 
