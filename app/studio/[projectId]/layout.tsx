@@ -17,11 +17,10 @@ export default function StudioLayout({
   const [activeTab, setActiveTab] = useState<"view" | "ai" | "files" | "map">("view");
 
   return (
-    // THE OUTER BOX: Fixed screen, flex column
     <div className="fixed inset-0 bg-black flex flex-col overflow-hidden w-full h-full">
 
       {/* BOX 1: TOP HEADER */}
-      <header className="h-20 w-full shrink-0 border-b border-white/5 flex flex-col justify-center px-6 bg-black relative">
+      <header className="h-20 w-full shrink-0 border-b border-white/5 flex flex-col justify-center px-6 bg-black z-[60] relative">
         <div className="flex flex-col">
           <h1 className="text-lg font-bold text-white tracking-tight leading-none mb-1">
             Project Alpha
@@ -32,46 +31,46 @@ export default function StudioLayout({
         </div>
       </header>
 
-      {/* BOX 2: THE WORKSPACE (The containment field) */}
-      {/* 'overflow-hidden' here is what prevents panels from going into the header/footer */}
-      <main className="relative flex-1 w-full bg-black overflow-hidden border-y border-transparent">
-        
-        {/* VIEW PANEL (Base content) */}
+      {/* BOX 2: THE WORKSPACE */}
+      <main className="relative flex-1 w-full bg-black overflow-hidden border-y border-transparent z-10">
+
+        {/* VIEW PANEL: Base Layer (z-0) */}
         <div className={cn(
-          "absolute inset-0 transition-opacity duration-300", 
+          "absolute inset-0 z-0 transition-opacity duration-300", 
           activeTab === "view" ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
         )}>
           {children}
         </div>
 
-        {/* SLIDING PANELS: These only exist within the 'main' box boundaries */}
+        {/* SLIDING PANELS: Added z-index and conditional visibility */}
+        
         {/* AI PANEL */}
         <div className={cn(
-          "absolute inset-0 bg-black transition-transform duration-500 ease-in-out flex flex-col", 
-          activeTab === "ai" ? "translate-y-0" : "translate-y-full"
+          "absolute inset-0 bg-black transition-all duration-500 ease-in-out flex flex-col", 
+          activeTab === "ai" ? "translate-y-0 z-50 visible" : "translate-y-full z-0 invisible pointer-events-none"
         )}>
            <ChatInterface />
         </div>
 
         {/* FILES PANEL */}
         <div className={cn(
-          "absolute inset-0 bg-black transition-transform duration-500 ease-in-out flex flex-col", 
-          activeTab === "files" ? "translate-y-0" : "translate-y-full"
+          "absolute inset-0 bg-black transition-all duration-500 ease-in-out flex flex-col", 
+          activeTab === "files" ? "translate-y-0 z-50 visible" : "translate-y-full z-0 invisible pointer-events-none"
         )}>
            <FileExplorer />
         </div>
 
         {/* LOGIC MAP PANEL */}
         <div className={cn(
-          "absolute inset-0 bg-black transition-transform duration-500 ease-in-out flex flex-col", 
-          activeTab === "map" ? "translate-y-0" : "translate-y-full"
+          "absolute inset-0 bg-black transition-all duration-500 ease-in-out flex flex-col", 
+          activeTab === "map" ? "translate-y-0 z-50 visible" : "translate-y-full z-0 invisible pointer-events-none"
         )}>
            <LogicMap />
         </div>
       </main>
 
       {/* BOX 3: FOOTER / DOCK */}
-      <footer className="h-24 w-full shrink-0 bg-black border-t border-white/5 flex items-center justify-center relative">
+      <footer className="h-24 w-full shrink-0 bg-black border-t border-white/5 flex items-center justify-center z-[60] relative">
         <BottomDock activeTab={activeTab} setActiveTab={setActiveTab} />
       </footer>
     </div>
