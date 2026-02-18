@@ -1,82 +1,119 @@
 import { create } from 'zustand';
+import { supabase } from '@/lib/supabase';
 
 export type ProjectFile = {
+  id?: string; // Optional because new local files might not have one yet
   name: string;
   content: string;
   language: string;
-  // Metadata for the Logic Map
   position?: { x: number; y: number };
-  linksTo?: string[]; // Array of file names this page connects to
+  linksTo?: string[];
 };
 
 interface FileState {
   files: ProjectFile[];
   activeFile: string | null;
-  updateFile: (name: string, content: string) => void;
-  deleteFile: (name: string) => void;
+  isLoading: boolean;
+  
+  // Actions
+  fetchFiles: (projectId: string) => Promise<void>;
+  updateFile: (projectId: string, name: string, content: string) => void;
+  updateFilePosition: (projectId: string, name: string, x: number, y: number) => void;
   setActiveFile: (name: string) => void;
-  setInitialFiles: (files: ProjectFile[]) => void;
-  // NEW: Architect actions
-  updateFilePosition: (name: string, x: number, y: number) => void;
-  addConnection: (from: string, to: string) => void;
 }
 
-export const useFileStore = create<FileState>((set) => ({
-  files: [
-    {
-      name: 'app/page.tsx',
-      language: 'typescript',
-      content: `export default function Page() {
-  return (
-    <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-4">
-      <h1 className="text-3xl font-bold text-white">Project Alpha</h1>
-      <p className="text-zinc-400">Describe what you want to build in the AI tab!</p>
-    </div>
-  );
-}`,
-      position: { x: 50, y: 50 },
-      linksTo: []
-    }
-  ],
-  activeFile: 'app/page.tsx',
+export const useFileStore = create<FileState>((set, get) => ({
+  files: [],
+  activeFile: null,
+  isLoading: false,
 
-  updateFile: (name, content) => set((state) => {
-    const exists = state.files.find(f => f.name === name);
-    if (exists) {
-      // Preserve existing metadata (position/links) when updating content
-      return {
-        files: state.files.map(f => f.name === name ? { ...f, content } : f)
-      };
+  // 1. FETCH: Load files from Supabase on startup
+  fetchFiles: async (projectId) => {
+    set({ isLoading: true });
+    
+    const { data, error } = await supabase
+      .from('files')
+      .select('*')
+      .eq('project_id', projectId);
+
+    if (error) {
+      console.error('Error loading files:', error);
+      set({ isLoading: false });
+      return;
     }
-    // Set default meta for new AI-generated files
-    return {
-      files: [...state.files, { 
+
+    // Map DB format to App format
+    const loadedFiles: ProjectFile[] = data.map((f) => ({
+      id: f.id,
+      name: f.name,
+      content: f.content,
+      language: f.language,
+      position: { x: Number(f.position_x), y: Number(f.position_y) },
+      linksTo: f.links_to || []
+    }));
+
+    // If empty, set a default page but DON'T save it yet (wait for user action)
+    if (loadedFiles.length === 0) {
+      set({ 
+        files: [{
+          name: 'app/page.tsx',
+          content: '// Start building...',
+          language: 'typescript',
+          position: { x: 100, y: 100 }
+        }],
+        activeFile: 'app/page.tsx',
+        isLoading: false 
+      });
+    } else {
+      set({ 
+        files: loadedFiles, 
+        activeFile: loadedFiles[0].name,
+        isLoading: false 
+      });
+    }
+  },
+
+  // 2. UPDATE CONTENT: Save code changes
+  updateFile: async (projectId, name, content) => {
+    // Optimistic Update (Show changes instantly)
+    set((state) => ({
+      files: state.files.map((f) => f.name === name ? { ...f, content } : f)
+    }));
+
+    // Database Update (Upsert = Update if exists, Insert if new)
+    const { error } = await supabase
+      .from('files')
+      .upsert({ 
+        project_id: projectId, 
         name, 
-        content, 
-        language: 'typescript',
-        position: { x: 100, y: 100 },
-        linksTo: []
-      }]
-    };
-  }),
+        content,
+        updated_at: new Date().toISOString() 
+      }, { onConflict: 'project_id, name' });
 
-  deleteFile: (name) => set((state) => ({
-    files: state.files.filter(f => f.name !== name)
-  })),
+    if (error) console.error('Failed to save file:', error);
+  },
+
+  // 3. UPDATE POSITION: Save Logic Map movement
+  updateFilePosition: async (projectId, name, x, y) => {
+    // Optimistic Update
+    set((state) => ({
+      files: state.files.map((f) => 
+        f.name === name ? { ...f, position: { x, y } } : f
+      )
+    }));
+
+    // Database Update
+    const { error } = await supabase
+      .from('files')
+      .upsert({ 
+        project_id: projectId, 
+        name, 
+        position_x: x, 
+        position_y: y 
+      }, { onConflict: 'project_id, name' });
+
+    if (error) console.error('Failed to save position:', error);
+  },
 
   setActiveFile: (name) => set({ activeFile: name }),
-
-  setInitialFiles: (files) => set({ files }),
-
-  // Updates the 2D coordinates for a file's node on the Logic Map
-  updateFilePosition: (name, x, y) => set((state) => ({
-    files: state.files.map(f => f.name === name ? { ...f, position: { x, y } } : f)
-  })),
-
-  // Connects one file to another (e.g., Home page has a button to About page)
-  addConnection: (from, to) => set((state) => ({
-    files: state.files.map(f => f.name === from 
-      ? { ...f, linksTo: Array.from(new Set([...(f.linksTo || []), to])) } 
-      : f)
-  })),
 }));
