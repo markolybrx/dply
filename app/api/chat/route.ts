@@ -8,69 +8,71 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.G
 export const runtime = "edge";
 
 const SYSTEM_INSTRUCTION = `
-You are an expert AI Mobile App Builder.
+You are an expert AI Mobile App Builder using Next.js 14, Tailwind CSS, and Lucide React.
 
-INSTRUCTIONS:
-1. First, breakdown your task into 3-4 logical execution steps using :::LOG::: format.
-2. If you need to modify or create a file, use the :::UPDATE::: format.
-3. Use the :::UPDATE::: format ONLY for the code itself.
-4. After the logs and updates, provide a friendly summary to the user.
+STRICT PROTOCOL - FOLLOW THIS EXACTLY:
+1. ANALYSIS: Break down the request into logical steps.
+2. EXECUTION: For every step, output a LOG and then the UPDATE.
+3. FORMAT:
+   :::LOG::: Action Title | Brief technical description of what you are doing.
+   :::UPDATE::: path/to/file.ext | [RAW CODE CONTENT HERE - NO MARKDOWN BACKTICKS]
 
-FORMAT RULES:
-:::LOG::: Title | Brief technical explanation.
-:::UPDATE::: filename | [Full code content for that file]
+4. RULES:
+   - Do NOT wrap the file content in \`\`\` (markdown code blocks). Just output the raw code.
+   - Always update 'app/page.tsx' if the user wants to see a visual change.
+   - Ensure 'app/page.tsx' exports a default component.
+   - Use 'lucide-react' for icons.
 
-EXAMPLE:
-:::LOG::: Updating Home | Adding a new hero section.
-:::UPDATE::: app/page.tsx | export default function Page() { return <div>Hello World</div> }
+EXAMPLE STREAM:
+:::LOG::: Analyzing Request | Identifying necessary components for the calculator.
+:::UPDATE::: app/page.tsx | import React from 'react'; export default function Page() { return <div>Calculator</div> }
+:::LOG::: Adding Styles | Applying Tailwind classes for the grid layout.
+:::UPDATE::: app/globals.css | @tailwind base; @tailwind components; @tailwind utilities;
+
+FINAL SUMMARY:
+(After all logs and updates are done, provide a short, friendly message here).
 `;
 
 export async function POST(req: Request) {
   try {
-    // FIX 1: Extract 'messages' (Standard Vercel format)
     const { messages } = await req.json();
 
     if (!messages) {
       return new Response("No messages found", { status: 400 });
     }
 
-    // FIX 2: Use the model that works for you (2.5 Flash)
-    // We explicitly point to the latest flash model
+    // Use Gemini 2.5 Flash for speed
     const geminiModel = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash", // Or "gemini-2.0-flash-exp" if available to you
       generationConfig: {
         maxOutputTokens: 8000,
         temperature: 0.7,
       }
     });
 
-    // 4. Format Conversation for Gemini
     const formattedHistory = messages.map((msg: Message) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],
     }));
 
-    // Inject System Instruction at the very start
+    // Inject System Instruction as the first "User" message to force compliance
     const promptWithSystem = [
       {
         role: "user",
-        parts: [{ text: SYSTEM_INSTRUCTION + "\n\nUser asked: " + messages[messages.length - 1].content }]
+        parts: [{ text: SYSTEM_INSTRUCTION + "\n\nUser Request: " + messages[messages.length - 1].content }]
       }
     ];
 
-    // 5. Generate Stream
     const geminiStream = await geminiModel.generateContentStream({
       contents: formattedHistory.length > 1 ? formattedHistory : promptWithSystem, 
     });
 
-    // 6. Return Stream
     const stream = GoogleGenerativeAIStream(geminiStream);
 
     return new StreamingTextResponse(stream);
 
   } catch (error: any) {
     console.error("Chat API Error:", error);
-    // Return the actual error message so we can see it in logs if it fails again
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }
