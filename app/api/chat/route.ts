@@ -1,75 +1,70 @@
-import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAIStream, Message, StreamingTextResponse } from "ai";
+
+// 1. Setup Google AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
+
+// 2. Use Edge Runtime for speed
+export const runtime = "edge";
+
+const SYSTEM_INSTRUCTION = `
+You are an expert AI Mobile App Builder.
+
+INSTRUCTIONS:
+1. First, breakdown your task into 3-4 logical execution steps using :::LOG::: format.
+2. If you need to modify or create a file, use the :::UPDATE::: format.
+3. Use the :::UPDATE::: format ONLY for the code itself.
+4. After the logs and updates, provide a friendly summary to the user.
+
+FORMAT RULES:
+:::LOG::: Title | Brief technical explanation.
+:::UPDATE::: filename | [Full code content for that file]
+
+EXAMPLE:
+:::LOG::: Updating Home | Adding a new hero section.
+:::UPDATE::: app/page.tsx | export default function Page() { return <div>Hello World</div> }
+`;
 
 export async function POST(req: Request) {
   try {
-    const { message, history } = await req.json();
-    const apiKey = process.env.GEMINI_API_KEY;
+    // FIX 1: Extract 'messages' (Standard Vercel format), not 'history'
+    const { messages } = await req.json();
 
-    if (!apiKey) {
-      return NextResponse.json({ error: "Server Error: Missing GEMINI_API_KEY" }, { status: 500 });
+    if (!messages) {
+      return new Response("No messages found", { status: 400 });
     }
 
-    const conversationContext = history
-      .map((msg: any) => `${msg.role.toUpperCase()}: ${msg.content}`)
-      .join("\n");
+    // 3. Initialize Model (Using gemini-1.5-flash for speed/reliability)
+    const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        const finalPrompt = `
-      You are an expert AI Mobile App Builder.
-      
-      INSTRUCTIONS:
-      1. First, breakdown your task into 3-4 logical execution steps using :::LOG::: format.
-      2. If you need to modify or create a file, use the :::UPDATE::: format.
-      3. Use the :::UPDATE::: format ONLY for the code itself.
-      4. After the logs and updates, provide a friendly summary to the user.
+    // 4. Format Conversation for Gemini
+    // We prepend the system instruction to the first message to ensure the AI follows rules
+    const formattedHistory = messages.map((msg: Message) => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.content }],
+    }));
 
-      FORMAT RULES:
-      :::LOG::: Title | Brief technical explanation.
-      :::UPDATE::: filename | [Full code content for that file]
-      
-      EXAMPLE:
-      :::LOG::: Updating Home | Adding a new hero section.
-      :::UPDATE::: app/page.tsx | export default function Page() { return <div>Hello World</div> }
-      
-      I've updated your home page with the new hero section!
-      
-      REAL CONVERSATION:
-      ${conversationContext}
-      
-      USER: ${message}
-      
-      ASSISTANT:
-    `;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    // Inject System Instruction at the very start
+    const promptWithSystem = [
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: finalPrompt }] }],
-          generationConfig: {
-            maxOutputTokens: 8000,
-            temperature: 0.7,
-          },
-        }),
+        role: "user",
+        parts: [{ text: SYSTEM_INSTRUCTION + "\n\nUser asked: " + messages[messages.length - 1].content }]
       }
-    );
+    ];
 
-    const data = await response.json();
+    // 5. Generate Stream
+    const geminiStream = await geminiModel.generateContentStream({
+      contents: formattedHistory.length > 1 ? formattedHistory : promptWithSystem, 
+    });
 
-    if (data.error) {
-      if (data.error.code === 429) {
-         throw new Error("I'm thinking too fast! Please wait a moment.");
-      }
-      throw new Error(data.error.message);
-    }
+    // FIX 2: Return a Stream, not JSON
+    // This allows the text to "type out" in your chat interface
+    const stream = GoogleGenerativeAIStream(geminiStream);
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "System Error";
+    return new StreamingTextResponse(stream);
 
-    return NextResponse.json({ reply });
-
-  } catch (error: any) {
-    console.error("Backend Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error("Chat API Error:", error);
+    return new Response(JSON.stringify({ error: "Internal Server Error" }), { status: 500 });
   }
 }
