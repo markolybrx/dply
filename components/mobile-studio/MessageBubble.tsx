@@ -2,11 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { User, Sparkles, Check, ChevronDown, Loader2, FileCode } from "lucide-react";
+import { User, Sparkles, Check, ChevronDown, Loader, FileCode } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/store/useFileStore";
 import { useParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface MessageBubbleProps {
   role: "user" | "assistant" | "system";
@@ -19,25 +18,26 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
   const params = useParams();
   const projectId = params.projectId as string;
   
-  // State to toggle accordions
+  // State to toggle accordions (Simple boolean map)
   const [expandedLogs, setExpandedLogs] = useState<Record<number, boolean>>({});
 
   // --- SMART PARSING ENGINE ---
   const parsedData = useMemo(() => {
+    // If it's a user message, just return the content as-is
     if (!isAi) return { cleanContent: content, logs: [], updates: [] };
 
     const logs: { title: string; desc: string }[] = [];
     const updates: { fileName: string; content: string }[] = [];
     
-    // 1. Extract Logs (:::LOG::: Title | Description)
+    // 1. Extract Logs
+    // We create new Regex objects to avoid stateful issues
     const logRegex = /:::LOG:::\s*(.*?)\s*\|\s*(.*?)(?=(:::|$))/g;
     let logMatch;
     while ((logMatch = logRegex.exec(content)) !== null) {
       logs.push({ title: logMatch[1].trim(), desc: logMatch[2].trim() });
     }
 
-    // 2. Extract Updates (:::UPDATE::: File | Content)
-    // Relaxed Regex: Captures content until the next ':::' or End of String
+    // 2. Extract Updates
     const updateRegex = /:::UPDATE:::\s*(.*?)\s*\|\s*([\s\S]*?)(?=(:::LOG|:::UPDATE|$))/g;
     let updateMatch;
     while ((updateMatch = updateRegex.exec(content)) !== null) {
@@ -47,16 +47,12 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
       });
     }
 
-    // 3. Clean Content (Remove all technical blocks to show only the friendly summary)
-    let cleanContent = content
-      .replace(logRegex, "")
-      .replace(updateRegex, "")
-      .trim();
-
-    // Fallback if AI only sends code/logs and no summary
-    if (!cleanContent && (logs.length > 0 || updates.length > 0)) {
-      cleanContent = ""; // Empty string allows the UI to just show the logs
-    }
+    // 3. Clean Content
+    // We use split/join logic or simple replace to strip technical parts
+    let cleanContent = content;
+    cleanContent = cleanContent.replace(/:::LOG:::\s*(.*?)\s*\|\s*(.*?)(?=(:::|$))/g, "");
+    cleanContent = cleanContent.replace(/:::UPDATE:::\s*(.*?)\s*\|\s*([\s\S]*?)(?=(:::LOG|:::UPDATE|$))/g, "");
+    cleanContent = cleanContent.trim();
 
     return { cleanContent, logs, updates };
   }, [content, isAi]);
@@ -65,7 +61,7 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
   useEffect(() => {
     if (isAi && parsedData.updates.length > 0 && projectId) {
       parsedData.updates.forEach((update) => {
-        // Trigger the store update (Connects to File Explorer & Live Preview)
+        // Direct connection to File Explorer & Live Preview
         updateFile(projectId, update.fileName, update.content);
       });
     }
@@ -79,7 +75,7 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
     )}>
       {/* AI Avatar */}
       {isAi && (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center shrink-0 mt-1 border border-white/5">
+        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 mt-1 border border-white/5">
           <Sparkles className="w-4 h-4 text-indigo-400" />
         </div>
       )}
@@ -92,45 +88,38 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
         {/* 1. LOGS ACCORDION (The "Thinking" Process) */}
         {parsedData.logs.map((log, index) => {
            const isLast = index === parsedData.logs.length - 1;
-           // If it's the last log and no summary yet, it might be "active/loading"
+           // Active if it's the last log and no summary text has appeared yet
            const isActive = isLast && !parsedData.cleanContent; 
-           
+           const isOpen = expandedLogs[index];
+
            return (
-            <div key={index} className="w-full min-w-[300px] bg-[#111] border border-white/5 rounded-lg overflow-hidden">
+            <div key={index} className="w-full min-w-[280px] max-w-full bg-zinc-900 border border-white/5 rounded-lg overflow-hidden">
               <button 
                 onClick={() => setExpandedLogs(prev => ({ ...prev, [index]: !prev[index] }))}
                 className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 overflow-hidden">
                   {isActive ? (
-                    <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
+                    <Loader className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
                   ) : (
                     <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
                   )}
-                  <span className="text-xs font-mono text-zinc-300 uppercase tracking-wider">
+                  <span className="text-xs font-mono text-zinc-300 uppercase tracking-wider truncate">
                     {log.title}
                   </span>
                 </div>
                 <ChevronDown className={cn(
-                  "w-3.5 h-3.5 text-zinc-500 transition-transform duration-200",
-                  expandedLogs[index] ? "rotate-180" : ""
+                  "w-3.5 h-3.5 text-zinc-500 transition-transform duration-200 shrink-0",
+                  isOpen ? "rotate-180" : ""
                 )} />
               </button>
               
-              <AnimatePresence>
-                {expandedLogs[index] && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="p-3 pt-0 text-[11px] font-mono text-zinc-500 border-t border-white/5 bg-black/20">
-                      {log.desc}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* Standard Conditional Rendering (No Animation Libs) */}
+              {isOpen && (
+                <div className="p-3 pt-0 text-[11px] font-mono text-zinc-500 border-t border-white/5 bg-black/20 break-words whitespace-pre-wrap">
+                  {log.desc}
+                </div>
+              )}
             </div>
           );
         })}
@@ -150,9 +139,9 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
         )}
 
         {/* 3. MAIN MESSAGE (The Summary) */}
-        {parsedData.cleanContent && (
+        {(parsedData.cleanContent || role === "user") && (
           <div className={cn(
-            "rounded-2xl p-4 text-sm leading-relaxed shadow-sm",
+            "rounded-2xl p-4 text-sm leading-relaxed shadow-sm break-words",
             role === "user" 
               ? "bg-white text-black rounded-tr-sm" 
               : "bg-zinc-900 text-zinc-300 rounded-tl-sm border border-white/5"
