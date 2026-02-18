@@ -17,11 +17,9 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
   const { updateFile } = useFileStore();
   const params = useParams();
   const projectId = params.projectId as string;
-  
-  // Track which accordions are manually toggled by user
+
   const [userToggled, setUserToggled] = useState<Record<number, boolean>>({});
 
-  // --- DYNAMIC PHASE PARSER ---
   const parsedData = useMemo(() => {
     if (!isAi) return { cleanContent: content, logs: [], updates: [] };
 
@@ -34,7 +32,6 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
     let currentFileContent: string[] = [];
 
     lines.forEach((line) => {
-      // 1. Detect Phases
       if (line.startsWith("PHASE:")) {
         const [title, ...descParts] = line.replace("PHASE:", "").split("|");
         logs.push({
@@ -42,17 +39,12 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
           desc: descParts.join("|").trim(),
           isComplete: false
         });
-        // Mark previous log as complete if a new phase starts
         if (logs.length > 1) logs[logs.length - 2].isComplete = true;
       } 
-      
-      // 2. Detect Files
       else if (line.startsWith("FILE:")) {
         currentFile = line.replace("FILE:", "").trim();
         currentFileContent = [];
       } 
-      
-      // 3. Detect Completion
       else if (line.startsWith("COMPLETED:")) {
         if (currentFile) {
           updates.push({
@@ -63,8 +55,6 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
         currentFile = null;
         if (logs.length > 0) logs[logs.length - 1].isComplete = true;
       } 
-      
-      // 4. Capture Code or Summary
       else {
         if (currentFile) {
           currentFileContent.push(line);
@@ -81,7 +71,6 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
     };
   }, [content, isAi]);
 
-  // --- AUTO-SAVE SIDE EFFECT ---
   useEffect(() => {
     if (isAi && parsedData.updates.length > 0 && projectId) {
       parsedData.updates.forEach((update) => {
@@ -98,21 +87,22 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
         </div>
       )}
 
-      <div className={cn("relative max-w-[90%] flex flex-col gap-2", role === "user" ? "items-end" : "items-start")}>
-        
-        {/* DYNAMIC PHASE ACCORDIONS */}
+      {/* FIXED: Enforce w-full and a max-width to keep accordions consistent */}
+      <div className={cn(
+        "relative flex flex-col gap-2 w-full max-w-[90%]", 
+        role === "user" ? "items-end" : "items-start"
+      )}>
+
         {parsedData.logs.map((log, index) => {
            const isLast = index === parsedData.logs.length - 1;
            const isWorking = isLast && !log.isComplete;
-           
-           // Auto-open if it's currently working, otherwise respect user toggle
            const isOpen = userToggled[index] !== undefined ? userToggled[index] : isWorking;
 
            return (
-            <div key={index} className="w-full min-w-[280px] bg-zinc-900 border border-white/5 rounded-lg overflow-hidden transition-all duration-300">
+            <div key={index} className="w-full bg-zinc-900 border border-white/5 rounded-lg overflow-hidden transition-all duration-300">
               <button 
                 onClick={() => setUserToggled(prev => ({ ...prev, [index]: !isOpen }))}
-                className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
+                className="w-full flex items-center justify-between p-3.5 hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center gap-3 overflow-hidden">
                   {isWorking ? (
@@ -132,9 +122,9 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
                   isOpen ? "rotate-180" : ""
                 )} />
               </button>
-              
+
               {isOpen && (
-                <div className="px-3 pb-3 text-[11px] font-mono text-zinc-500 leading-relaxed border-t border-white/5 pt-2 bg-black/20">
+                <div className="px-4 pb-4 text-[11px] font-mono text-zinc-500 leading-relaxed border-t border-white/5 pt-3 bg-black/20">
                   {log.desc || "Executing task protocols..."}
                 </div>
               )}
@@ -142,7 +132,6 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
           );
         })}
 
-        {/* FILE UPDATES SUMMARY */}
         {parsedData.updates.length > 0 && (
           <div className="flex flex-wrap gap-2 my-1">
             {parsedData.updates.map((update, i) => (
@@ -156,7 +145,6 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
           </div>
         )}
 
-        {/* CLEAN SUMMARY MESSAGE */}
         {(parsedData.cleanContent || role === "user") && (
           <div className={cn(
             "rounded-2xl p-4 text-sm leading-relaxed shadow-sm break-words",
