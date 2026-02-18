@@ -1,100 +1,103 @@
 "use client";
 
 import React, { useEffect, useMemo } from "react";
-import { cn } from "@/lib/utils";
-import { Bot, User } from "lucide-react";
-import { Message } from "@/store/useChatStore";
-import { useFileStore } from "@/store/useFileStore";
 import ReactMarkdown from "react-markdown";
-import { LogAccordion } from "./LogAccordion";
+import { User, Sparkles, FileCode, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useFileStore } from "@/store/useFileStore";
+import { useParams } from "next/navigation";
 
 interface MessageBubbleProps {
-  message: Message;
+  role: "user" | "assistant" | "system";
+  content: string;
 }
 
-export const MessageBubble = ({ message }: MessageBubbleProps) => {
-  const isAi = message.role === "assistant";
+export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
+  const isAi = role === "assistant";
   const { updateFile } = useFileStore();
+  
+  // 1. GET PROJECT ID FROM URL
+  const params = useParams();
+  const projectId = params.projectId as string;
 
-  // We use useMemo to parse the content once per message
+  // Smart Parsing: Detects if the AI is trying to write code updates
+  // Looks for blocks like: :::UPDATE app/page.tsx::: [code] :::END:::
   const parsedData = useMemo(() => {
-    const rawContent = message.content;
-    const logs: { title: string; desc: string }[] = [];
     const updates: { fileName: string; content: string }[] = [];
-    let cleanMessage = rawContent;
+    let cleanContent = content;
 
-    if (!isAi) return { logs, updates, cleanMessage };
+    if (isAi && content.includes(":::UPDATE")) {
+      const regex = /:::UPDATE\s+(.*?):::\n([\s\S]*?):::END:::/g;
+      let match;
+      while ((match = regex.exec(content)) !== null) {
+        updates.push({
+          fileName: match[1].trim(),
+          content: match[2].trim()
+        });
+      }
+      // Remove the raw code blocks from the visible message to keep it clean
+      cleanContent = content.replace(regex, "").trim();
+      if (!cleanContent) cleanContent = "I've updated the files for you.";
+    }
 
-    // 1. Extract Logs: :::LOG::: Title | Description
-    const logRegex = /:::LOG::: (.*?)\|(.*)/g;
-    const logMatches = [...rawContent.matchAll(logRegex)];
-    logMatches.forEach((match) => {
-      logs.push({ title: match[1].trim(), desc: match[2].trim() });
-    });
+    return { cleanContent, updates };
+  }, [content, isAi]);
 
-    // 2. Extract File Updates: :::UPDATE::: filename | code_content
-    // This regex looks for :::UPDATE::: followed by a filename, a pipe, 
-    // and then everything until it hits another ::: command or the end of the string.
-    const updateRegex = /:::UPDATE::: (.*?)\s*\|([\s\S]*?)(?=(?:\n:::|$))/g;
-    const updateMatches = [...rawContent.matchAll(updateRegex)];
-    updateMatches.forEach((match) => {
-      updates.push({ fileName: match[1].trim(), content: match[2].trim() });
-    });
-
-    // 3. Clean the final message (Remove the metadata tags from UI)
-    cleanMessage = rawContent
-      .replace(/:::LOG::: (.*?)\|(.*)/g, "")
-      .replace(/:::UPDATE::: (.*?)\s*\|([\s\S]*?)(?=(?:\n:::|$))/g, "")
-      .trim();
-
-    return { logs, updates, cleanMessage };
-  }, [message.content, isAi]);
-
-  // EFFECT: Physically update the file store when a new message with updates arrives
+  // 2. AUTO-SAVE UPDATES
+  // If the AI sent code, save it to the store + database immediately
   useEffect(() => {
     if (isAi && parsedData.updates.length > 0) {
       parsedData.updates.forEach((update) => {
-        updateFile(update.fileName, update.content);
+        if (projectId) {
+            // FIX: Now passing 3 arguments (ProjectID, FileName, Content)
+            updateFile(projectId, update.fileName, update.content);
+        }
       });
     }
-  }, [parsedData.updates, isAi, updateFile]);
+  }, [parsedData.updates, isAi, updateFile, projectId]);
 
   return (
-    <div className={cn("flex w-full mb-8", isAi ? "justify-start" : "justify-end")}>
-      <div className={cn("flex max-w-[95%] gap-3", isAi ? "flex-row" : "flex-row-reverse")}>
+    <div className={cn(
+      "flex w-full gap-3 mb-6",
+      role === "user" ? "justify-end" : "justify-start"
+    )}>
+      {/* AI Avatar */}
+      {isAi && (
+        <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 mt-1">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+        </div>
+      )}
 
-        {/* Avatar */}
-        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 border mt-1", 
-          isAi ? "bg-black border-zinc-800 text-primary" : "bg-white text-black border-white")}>
-          {isAi ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+      <div className={cn(
+        "relative max-w-[85%] rounded-2xl p-3.5 text-sm leading-relaxed",
+        role === "user" 
+          ? "bg-white text-black rounded-tr-sm" 
+          : "bg-zinc-900 text-zinc-300 rounded-tl-sm border border-white/5"
+      )}>
+        {/* Message Content */}
+        <div className="prose prose-invert prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 max-w-none">
+          <ReactMarkdown>{parsedData.cleanContent}</ReactMarkdown>
         </div>
 
-        <div className="flex flex-col w-full min-w-0">
-          {/* RENDER LOGS (Accordions) */}
-          {isAi && parsedData.logs.length > 0 && (
-            <div className="mb-4 space-y-1 w-full max-w-sm">
-              {parsedData.logs.map((log, i) => (
-                <LogAccordion key={i} title={log.title} description={log.desc} />
-              ))}
-            </div>
-          )}
-
-          {/* RENDER FINAL TEXT (Clean Message) */}
-          {parsedData.cleanMessage && (
-            <div className={cn("relative px-4 py-3 text-sm leading-relaxed shadow-lg overflow-hidden",
-              isAi ? "bg-zinc-900/80 border border-white/10 text-zinc-100 rounded-2xl rounded-tl-none backdrop-blur-md" 
-                   : "bg-white text-black rounded-2xl rounded-tr-none")}>
-              {isAi ? (
-                <div className="prose prose-invert prose-sm max-w-none break-words">
-                  <ReactMarkdown>{parsedData.cleanMessage}</ReactMarkdown>
-                </div>
-              ) : (
-                <p className="whitespace-pre-wrap break-words">{parsedData.cleanMessage}</p>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Update Indicators (If AI modified files) */}
+        {parsedData.updates.length > 0 && (
+          <div className="mt-3 flex flex-col gap-2">
+            {parsedData.updates.map((update, i) => (
+              <div key={i} className="flex items-center gap-2 text-[10px] bg-green-500/10 text-green-400 px-3 py-2 rounded-lg border border-green-500/20">
+                <CheckCircle2 className="w-3 h-3" />
+                <span className="font-mono">Updated: {update.fileName}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* User Avatar */}
+      {role === "user" && (
+        <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center shrink-0 mt-1">
+          <User className="w-3.5 h-3.5 text-white" />
+        </div>
+      )}
     </div>
   );
 };
