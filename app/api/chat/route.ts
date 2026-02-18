@@ -2,7 +2,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleGenerativeAIStream, Message, StreamingTextResponse } from "ai";
 
 // 1. Setup Google AI
-// We check for both variable names to be safe
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
 
 // 2. Use Edge Runtime for speed
@@ -43,10 +42,9 @@ export async function POST(req: Request) {
       return new Response("No messages found", { status: 400 });
     }
 
-    // 3. Initialize Model
-    // 'gemini-1.5-flash' is currently the fastest and most reliable for this streaming setup
+    // 3. Initialize Model - FORCED TO 2.5-FLASH
     const geminiModel = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       generationConfig: {
         maxOutputTokens: 8000,
         temperature: 0.7,
@@ -54,18 +52,15 @@ export async function POST(req: Request) {
     });
 
     // 4. Format Conversation
-    // We strictly define the roles for Gemini (user/model)
     const formattedHistory = messages.map((msg: Message) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],
     }));
 
     // 5. Inject System Instruction
-    // We attach the system instruction to the very last user message to ensure it's "fresh" in the AI's context
-    // This trick often works better than a separate system message for keeping the AI on track
     const lastMessage = messages[messages.length - 1];
     const promptWithSystem = [
-      ...formattedHistory.slice(0, -1), // Previous history
+      ...formattedHistory.slice(0, -1),
       {
         role: "user",
         parts: [{ text: SYSTEM_INSTRUCTION + "\n\nUser Request: " + lastMessage.content }]
@@ -77,7 +72,6 @@ export async function POST(req: Request) {
       contents: promptWithSystem, 
     });
 
-    // 7. Return Stream
     const stream = GoogleGenerativeAIStream(geminiStream);
 
     return new StreamingTextResponse(stream);
