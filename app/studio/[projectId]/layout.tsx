@@ -5,7 +5,7 @@ import { BottomDock } from "@/components/mobile-studio/BottomDock";
 import { ChatInterface } from "@/components/mobile-studio/ChatInterface";
 import { FileExplorer } from "@/components/mobile-studio/FileExplorer";
 import { LogicMap } from "@/components/mobile-studio/LogicMap";
-import { ToastContainer } from "@/components/ui/ToastContainer"; // <--- Added this
+import { ToastContainer } from "@/components/ui/ToastContainer"; 
 import { cn } from "@/lib/utils";
 
 export default function StudioLayout({
@@ -15,14 +15,12 @@ export default function StudioLayout({
   children: React.ReactNode;
   params: { projectId: string };
 }) {
-  // These string values must match the IDs in your BottomDock
   const [activeTab, setActiveTab] = useState<"view" | "ai" | "files" | "map">("view");
 
   return (
-    // ROOT: Locked to viewport
     <div className="fixed inset-0 bg-black flex flex-col overflow-hidden w-full h-full">
 
-      {/* BOX 1: TOP HEADER (Z-60 to block panels) */}
+      {/* BOX 1: HEADER */}
       <header className="h-20 w-full shrink-0 border-b border-white/5 flex flex-col justify-center px-6 bg-black z-[60] relative">
         <div className="flex flex-col">
           <h1 className="text-lg font-bold text-white tracking-tight leading-none mb-1">
@@ -34,10 +32,10 @@ export default function StudioLayout({
         </div>
       </header>
 
-      {/* BOX 2: THE WORKSPACE (The Containment Zone) */}
+      {/* BOX 2: WORKSPACE (Middle Container) */}
       <main className="relative flex-1 w-full bg-black overflow-hidden border-y border-transparent z-10">
 
-        {/* 1. LIVE PREVIEW (Base Layer) */}
+        {/* 1. VIEW PANEL */}
         <div className={cn(
           "absolute inset-0 z-0 transition-opacity duration-300", 
           activeTab === "view" ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
@@ -45,7 +43,7 @@ export default function StudioLayout({
           {children}
         </div>
 
-        {/* 2. AI CHAT PANEL */}
+        {/* 2. AI PANEL */}
         <div className={cn(
           "absolute inset-0 bg-black transition-all duration-500 ease-in-out flex flex-col", 
           activeTab === "ai" ? "translate-y-0 z-50 visible" : "translate-y-full z-0 invisible pointer-events-none"
@@ -53,7 +51,7 @@ export default function StudioLayout({
            <ChatInterface />
         </div>
 
-        {/* 3. FILE EXPLORER PANEL */}
+        {/* 3. FILES PANEL */}
         <div className={cn(
           "absolute inset-0 bg-black transition-all duration-500 ease-in-out flex flex-col", 
           activeTab === "files" ? "translate-y-0 z-50 visible" : "translate-y-full z-0 invisible pointer-events-none"
@@ -68,15 +66,17 @@ export default function StudioLayout({
         )}>
            <LogicMap />
         </div>
+
+        {/* 5. NOTIFICATION LAYER */}
+        {/* Now sits inside 'main', top-right relative to this workspace */}
+        <ToastContainer />
+
       </main>
 
-      {/* BOX 3: FOOTER / DOCK (Z-60 to block panels) */}
+      {/* BOX 3: FOOTER */}
       <footer className="h-24 w-full shrink-0 bg-black border-t border-white/5 flex items-center justify-center z-[60] relative">
         <BottomDock activeTab={activeTab} setActiveTab={setActiveTab} />
       </footer>
-
-      {/* NOTIFICATION LAYER: Floats above everything (Z-200) */}
-      <ToastContainer />
     </div>
   );
 }
