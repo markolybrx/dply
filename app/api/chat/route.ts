@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleGenerativeAIStream, Message, StreamingTextResponse } from "ai";
 
 // 1. Setup Google AI
+// We check for both variable names to be safe
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
 
 // 2. Use Edge Runtime for speed
@@ -22,10 +23,11 @@ STRICT PROTOCOL - FOLLOW THIS EXACTLY:
    - Always update 'app/page.tsx' if the user wants to see a visual change.
    - Ensure 'app/page.tsx' exports a default component.
    - Use 'lucide-react' for icons.
+   - If creating a complex UI, break it into smaller components if needed, but 'app/page.tsx' is the priority entry point.
 
 EXAMPLE STREAM:
 :::LOG::: Analyzing Request | Identifying necessary components for the calculator.
-:::UPDATE::: app/page.tsx | import React from 'react'; export default function Page() { return <div>Calculator</div> }
+:::UPDATE::: app/page.tsx | import React from 'react'; export default function Page() { return <div className="p-4"><h1>Calculator</h1></div> }
 :::LOG::: Adding Styles | Applying Tailwind classes for the grid layout.
 :::UPDATE::: app/globals.css | @tailwind base; @tailwind components; @tailwind utilities;
 
@@ -41,32 +43,41 @@ export async function POST(req: Request) {
       return new Response("No messages found", { status: 400 });
     }
 
-    // Use Gemini 2.5 Flash for speed
+    // 3. Initialize Model
+    // 'gemini-1.5-flash' is currently the fastest and most reliable for this streaming setup
     const geminiModel = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash", // Or "gemini-2.0-flash-exp" if available to you
+      model: "gemini-1.5-flash",
       generationConfig: {
         maxOutputTokens: 8000,
         temperature: 0.7,
       }
     });
 
+    // 4. Format Conversation
+    // We strictly define the roles for Gemini (user/model)
     const formattedHistory = messages.map((msg: Message) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],
     }));
 
-    // Inject System Instruction as the first "User" message to force compliance
+    // 5. Inject System Instruction
+    // We attach the system instruction to the very last user message to ensure it's "fresh" in the AI's context
+    // This trick often works better than a separate system message for keeping the AI on track
+    const lastMessage = messages[messages.length - 1];
     const promptWithSystem = [
+      ...formattedHistory.slice(0, -1), // Previous history
       {
         role: "user",
-        parts: [{ text: SYSTEM_INSTRUCTION + "\n\nUser Request: " + messages[messages.length - 1].content }]
+        parts: [{ text: SYSTEM_INSTRUCTION + "\n\nUser Request: " + lastMessage.content }]
       }
     ];
 
+    // 6. Generate Stream
     const geminiStream = await geminiModel.generateContentStream({
-      contents: formattedHistory.length > 1 ? formattedHistory : promptWithSystem, 
+      contents: promptWithSystem, 
     });
 
+    // 7. Return Stream
     const stream = GoogleGenerativeAIStream(geminiStream);
 
     return new StreamingTextResponse(stream);
