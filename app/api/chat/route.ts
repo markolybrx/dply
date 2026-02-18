@@ -27,18 +27,24 @@ EXAMPLE:
 
 export async function POST(req: Request) {
   try {
-    // FIX 1: Extract 'messages' (Standard Vercel format), not 'history'
+    // FIX 1: Extract 'messages' (Standard Vercel format)
     const { messages } = await req.json();
 
     if (!messages) {
       return new Response("No messages found", { status: 400 });
     }
 
-    // 3. Initialize Model (Using gemini-1.5-flash for speed/reliability)
-    const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // FIX 2: Use the model that works for you (2.5 Flash)
+    // We explicitly point to the latest flash model
+    const geminiModel = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        maxOutputTokens: 8000,
+        temperature: 0.7,
+      }
+    });
 
     // 4. Format Conversation for Gemini
-    // We prepend the system instruction to the first message to ensure the AI follows rules
     const formattedHistory = messages.map((msg: Message) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],
@@ -57,14 +63,14 @@ export async function POST(req: Request) {
       contents: formattedHistory.length > 1 ? formattedHistory : promptWithSystem, 
     });
 
-    // FIX 2: Return a Stream, not JSON
-    // This allows the text to "type out" in your chat interface
+    // 6. Return Stream
     const stream = GoogleGenerativeAIStream(geminiStream);
 
     return new StreamingTextResponse(stream);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Chat API Error:", error);
-    return new Response(JSON.stringify({ error: "Internal Server Error" }), { status: 500 });
+    // Return the actual error message so we can see it in logs if it fails again
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }
