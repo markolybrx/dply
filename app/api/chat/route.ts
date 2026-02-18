@@ -1,63 +1,48 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleGenerativeAIStream, Message, StreamingTextResponse } from "ai";
 
-// 1. Setup Google AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// 2. Use Edge Runtime for speed
 export const runtime = "edge";
 
 const SYSTEM_INSTRUCTION = `
-You are an expert AI Mobile App Builder using Next.js 14, Tailwind CSS, and Lucide React.
+You are an autonomous AI App Builder. 
+You must declare your current phase before you act to keep the system state synchronized.
 
-STRICT PROTOCOL - FOLLOW THIS EXACTLY:
-1. ANALYSIS: Break down the request into logical steps.
-2. EXECUTION: For every step, output a LOG and then the UPDATE.
-3. FORMAT:
-   :::LOG::: Action Title | Brief technical description of what you are doing.
-   :::UPDATE::: path/to/file.ext | [RAW CODE CONTENT HERE - NO MARKDOWN BACKTICKS]
+STRICT PROTOCOL:
+1. When changing tasks, start a new line with: PHASE: [Phase Name] | [Description]
+2. When writing code, start a new line with: FILE: [filename]
+3. Provide the RAW code immediately after the FILE line. Do NOT use markdown code blocks.
+4. When a file is complete, start a new line with: COMPLETED: [filename]
 
-4. RULES:
-   - Do NOT wrap the file content in \`\`\` (markdown code blocks). Just output the raw code.
-   - Always update 'app/page.tsx' if the user wants to see a visual change.
-   - Ensure 'app/page.tsx' exports a default component.
-   - Use 'lucide-react' for icons.
-   - If creating a complex UI, break it into smaller components if needed, but 'app/page.tsx' is the priority entry point.
+PHASES TO USE:
+- ANALYZING_REQUIREMENTS
+- REVIEWING_STRUCTURE
+- ARCHITECTING_COMPONENTS
+- IMPLEMENTING_LOGIC
+- REFINING_INTERFACE
 
-EXAMPLE STREAM:
-:::LOG::: Analyzing Request | Identifying necessary components for the calculator.
-:::UPDATE::: app/page.tsx | import React from 'react'; export default function Page() { return <div className="p-4"><h1>Calculator</h1></div> }
-:::LOG::: Adding Styles | Applying Tailwind classes for the grid layout.
-:::UPDATE::: app/globals.css | @tailwind base; @tailwind components; @tailwind utilities;
-
-FINAL SUMMARY:
-(After all logs and updates are done, provide a short, friendly message here).
+Example:
+PHASE: ANALYZING_REQUIREMENTS | Assessing layout needs for the requested calculator.
+PHASE: IMPLEMENTING_LOGIC | Writing the arithmetic functions and grid.
+FILE: app/page.tsx
+[raw code here]
+COMPLETED: app/page.tsx
 `;
 
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
-
-    if (!messages) {
-      return new Response("No messages found", { status: 400 });
-    }
-
-    // 3. Initialize Model - FORCED TO 2.5-FLASH
     const geminiModel = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
-      generationConfig: {
-        maxOutputTokens: 8000,
-        temperature: 0.7,
-      }
+      generationConfig: { maxOutputTokens: 8000, temperature: 0.4 }
     });
 
-    // 4. Format Conversation
     const formattedHistory = messages.map((msg: Message) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],
     }));
 
-    // 5. Inject System Instruction
     const lastMessage = messages[messages.length - 1];
     const promptWithSystem = [
       ...formattedHistory.slice(0, -1),
@@ -67,17 +52,10 @@ export async function POST(req: Request) {
       }
     ];
 
-    // 6. Generate Stream
-    const geminiStream = await geminiModel.generateContentStream({
-      contents: promptWithSystem, 
-    });
-
+    const geminiStream = await geminiModel.generateContentStream({ contents: promptWithSystem });
     const stream = GoogleGenerativeAIStream(geminiStream);
-
     return new StreamingTextResponse(stream);
-
   } catch (error: any) {
-    console.error("Chat API Error:", error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }
