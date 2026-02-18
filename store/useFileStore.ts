@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 
 export type ProjectFile = {
-  id?: string; // Optional because new local files might not have one yet
+  id?: string;
   name: string;
   content: string;
   language: string;
@@ -14,8 +14,6 @@ interface FileState {
   files: ProjectFile[];
   activeFile: string | null;
   isLoading: boolean;
-  
-  // Actions
   fetchFiles: (projectId: string) => Promise<void>;
   updateFile: (projectId: string, name: string, content: string) => void;
   updateFilePosition: (projectId: string, name: string, x: number, y: number) => void;
@@ -27,10 +25,8 @@ export const useFileStore = create<FileState>((set, get) => ({
   activeFile: null,
   isLoading: false,
 
-  // 1. FETCH: Load files from Supabase on startup
   fetchFiles: async (projectId) => {
     set({ isLoading: true });
-    
     const { data, error } = await supabase
       .from('files')
       .select('*')
@@ -42,7 +38,6 @@ export const useFileStore = create<FileState>((set, get) => ({
       return;
     }
 
-    // Map DB format to App format
     const loadedFiles: ProjectFile[] = data.map((f) => ({
       id: f.id,
       name: f.name,
@@ -52,57 +47,63 @@ export const useFileStore = create<FileState>((set, get) => ({
       linksTo: f.links_to || []
     }));
 
-    // If empty, set a default page but DON'T save it yet (wait for user action)
     if (loadedFiles.length === 0) {
-      set({ 
-        files: [{
-          name: 'app/page.tsx',
-          content: '// Start building...',
-          language: 'typescript',
-          position: { x: 100, y: 100 }
-        }],
-        activeFile: 'app/page.tsx',
-        isLoading: false 
-      });
+      const defaultFile = {
+        name: 'app/page.tsx',
+        content: '// Start building...',
+        language: 'typescript',
+        position: { x: 100, y: 100 }
+      };
+      set({ files: [defaultFile], activeFile: defaultFile.name, isLoading: false });
     } else {
-      set({ 
-        files: loadedFiles, 
-        activeFile: loadedFiles[0].name,
-        isLoading: false 
-      });
+      set({ files: loadedFiles, activeFile: loadedFiles[0].name, isLoading: false });
     }
   },
 
-  // 2. UPDATE CONTENT: Save code changes
   updateFile: async (projectId, name, content) => {
-    // Optimistic Update (Show changes instantly)
-    set((state) => ({
-      files: state.files.map((f) => f.name === name ? { ...f, content } : f)
-    }));
+    const currentState = get();
+    const fileExists = currentState.files.some((f) => f.name === name);
 
-    // Database Update (Upsert = Update if exists, Insert if new)
+    // 1. UPDATE STATE (Handle both Edit and Create)
+    if (fileExists) {
+      set((state) => ({
+        files: state.files.map((f) => f.name === name ? { ...f, content } : f),
+        // Force preview to refresh if the updated file is the active one
+        activeFile: name 
+      }));
+    } else {
+      // Create new file locally if AI introduces a new one
+      const newFile: ProjectFile = {
+        name,
+        content,
+        language: name.endsWith('.ts') || name.endsWith('.tsx') ? 'typescript' : 'css',
+        position: { x: Math.random() * 200 + 100, y: Math.random() * 200 + 100 }
+      };
+      set((state) => ({
+        files: [...state.files, newFile],
+        activeFile: name
+      }));
+    }
+
+    // 2. DATABASE PERSISTENCE
     const { error } = await supabase
       .from('files')
       .upsert({ 
         project_id: projectId, 
         name, 
         content,
+        language: name.endsWith('.tsx') ? 'typescript' : 'css',
         updated_at: new Date().toISOString() 
       }, { onConflict: 'project_id, name' });
 
-    if (error) console.error('Failed to save file:', error);
+    if (error) console.error('Database Save Error:', error);
   },
 
-  // 3. UPDATE POSITION: Save Logic Map movement
   updateFilePosition: async (projectId, name, x, y) => {
-    // Optimistic Update
     set((state) => ({
-      files: state.files.map((f) => 
-        f.name === name ? { ...f, position: { x, y } } : f
-      )
+      files: state.files.map((f) => f.name === name ? { ...f, position: { x, y } } : f)
     }));
 
-    // Database Update
     const { error } = await supabase
       .from('files')
       .upsert({ 
@@ -112,7 +113,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         position_y: y 
       }, { onConflict: 'project_id, name' });
 
-    if (error) console.error('Failed to save position:', error);
+    if (error) console.error('Position Save Error:', error);
   },
 
   setActiveFile: (name) => set({ activeFile: name }),
