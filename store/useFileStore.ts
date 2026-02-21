@@ -14,6 +14,7 @@ interface FileState {
   files: ProjectFile[];
   activeFile: string | null;
   isLoading: boolean;
+  isCompiling: boolean;
   fetchFiles: (projectId: string) => Promise<void>;
   updateFile: (projectId: string, name: string, content: string) => void;
   updateFilePosition: (projectId: string, name: string, x: number, y: number) => void;
@@ -24,6 +25,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   files: [],
   activeFile: null,
   isLoading: false,
+  isCompiling: false,
 
   fetchFiles: async (projectId) => {
     set({ isLoading: true });
@@ -61,6 +63,8 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   updateFile: async (projectId, name, content) => {
+    set({ isCompiling: true });
+    
     const currentState = get();
     const fileExists = currentState.files.some((f) => f.name === name);
 
@@ -97,6 +101,12 @@ export const useFileStore = create<FileState>((set, get) => ({
       }, { onConflict: 'project_id, name' });
 
     if (error) console.error('Database Save Error:', error);
+
+    // 3. REMOVE COMPILING STATE
+    // 800ms delay ensures Sandpack has time to process the local state update
+    setTimeout(() => {
+      set({ isCompiling: false });
+    }, 800);
   },
 
   updateFilePosition: async (projectId, name, x, y) => {
