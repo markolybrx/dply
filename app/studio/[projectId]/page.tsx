@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { CodePreview } from "@/components/mobile-studio/CodePreview";
+// Swapped CodePreview for LivePreview to enable the Sandpack runtime
+import { LivePreview } from "@/components/mobile-studio/LivePreview";
 import { useFileStore } from "@/store/useFileStore";
 import { useToastStore } from "@/store/useToastStore";
 
@@ -22,7 +23,7 @@ export default function StudioPage({ params }: { params: { projectId: string } }
           addToast("Failed to load project files", "error");
         }
       };
-      
+
       loadData();
     }
   }, [params.projectId, fetchFiles, addToast]);
@@ -30,9 +31,9 @@ export default function StudioPage({ params }: { params: { projectId: string } }
   return (
     <div className="w-full h-full bg-black">
       {/* This component acts as your live 'Screen'. 
-        It displays the content loaded into the store by the useEffect above.
+        It now uses the Sandpack Next.js runtime to compile and render the store's code.
       */}
-      <CodePreview />
+      <LivePreview />
     </div>
   );
 }
