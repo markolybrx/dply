@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { User, Sparkles, Check, ChevronDown, Loader, FileCode } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,9 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
   const projectId = params.projectId as string;
 
   const [userToggled, setUserToggled] = useState<Record<number, boolean>>({});
+  
+  // SECURE: Track which files have already been committed to the DB for this specific message
+  const processedFiles = useRef<Set<string>>(new Set());
 
   const parsedData = useMemo(() => {
     if (!isAi) return { cleanContent: content, logs: [], updates: [] };
@@ -74,7 +77,11 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
   useEffect(() => {
     if (isAi && parsedData.updates.length > 0 && projectId) {
       parsedData.updates.forEach((update) => {
-        updateFile(projectId, update.fileName, update.content);
+        // STRICT GATE: Only update the database if we haven't already processed this file
+        if (!processedFiles.current.has(update.fileName)) {
+          updateFile(projectId, update.fileName, update.content);
+          processedFiles.current.add(update.fileName);
+        }
       });
     }
   }, [parsedData.updates, isAi, updateFile, projectId]);
