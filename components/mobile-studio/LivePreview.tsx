@@ -45,10 +45,8 @@ export const LivePreview = () => {
             options={{
               showNavigator: false,
               showTabs: false,
-              showEditor: false,
-              showPreview: true,
-              editorHeight: "100%",
-              editorWidthPercentage: 0,
+              layout: "preview",
+              editorHeight: "100%"
             }}
             customSetup={{
               dependencies: {
