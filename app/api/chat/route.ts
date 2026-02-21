@@ -1,7 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { GoogleGenerativeAIStream, Message, StreamingTextResponse } from "ai";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import { google } from "@ai-sdk/google";
+import { streamText } from "ai";
 
 export const runtime = "edge";
 
@@ -33,28 +31,16 @@ COMPLETED: app/page.tsx
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
-    const geminiModel = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
-      generationConfig: { maxOutputTokens: 8000, temperature: 0.4 }
+
+    const result = streamText({
+      model: google("gemini-2.5-flash"),
+      system: SYSTEM_INSTRUCTION,
+      messages,
+      temperature: 0.4,
+      maxTokens: 8000,
     });
 
-    const formattedHistory = messages.map((msg: Message) => ({
-      role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.content }],
-    }));
-
-    const lastMessage = messages[messages.length - 1];
-    const promptWithSystem = [
-      ...formattedHistory.slice(0, -1),
-      {
-        role: "user",
-        parts: [{ text: SYSTEM_INSTRUCTION + "\n\nUser Request: " + lastMessage.content }]
-      }
-    ];
-
-    const geminiStream = await geminiModel.generateContentStream({ contents: promptWithSystem });
-    const stream = GoogleGenerativeAIStream(geminiStream);
-    return new StreamingTextResponse(stream);
+    return result.toDataStreamResponse();
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
