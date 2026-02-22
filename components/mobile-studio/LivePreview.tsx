@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // PREMIUM INFRASTRUCTURE: Silent injection of essential configurations.
+// This prevents the AI from wasting tokens on boilerplate and ensures Tailwind works instantly.
 const BASE_FILES = {
   "/styles/globals.css": `
 @tailwind base;
@@ -55,7 +56,7 @@ module.exports = {
 const SandpackBootMask = () => {
   const { sandpack } = useSandpack();
   // We mask the UI completely while Sandpack initializes its virtual machine
-  const isBooting = sandpack.status === "initializing" || sandpack.status === "idle";
+  const isBooting = sandpack.status === "initial" || sandpack.status === "idle";
 
   if (!isBooting) return null;
 
@@ -76,7 +77,7 @@ export const LivePreview = () => {
   const sandpackFiles = useMemo(() => {
     const dynamicFiles = files.reduce((acc, file) => {
       let path = file.name.startsWith("/") ? file.name : `/${file.name}`;
-      
+
       // APP ROUTER PROXY: Transparently translate app/page to pages/index to prevent Sandpack crashes
       if (path === "/app/page.tsx" || path === "/app/page.jsx") {
         path = "/pages/index.tsx";
