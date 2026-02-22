@@ -100,7 +100,7 @@ const SandpackErrorHandler = () => {
 
   const handleAutoFix = () => {
     setIsFixing(true);
-    
+
     // Extract the raw trace and beam it to the ChatInterface via a global window event
     const errorMessage = sandpack.error?.message || "Unknown compilation error in Sandpack engine.";
     window.dispatchEvent(new CustomEvent("DPLY_AUTO_FIX", { 
@@ -121,7 +121,7 @@ const SandpackErrorHandler = () => {
         </svg>
       </div>
       <p className="text-sm text-red-300 font-mono mb-8">System compilation failed.</p>
-      
+
       <button
         onClick={handleAutoFix}
         disabled={isFixing}
@@ -167,7 +167,10 @@ export const LivePreview = () => {
   }, []);
 
   const sandpackFiles = useMemo(() => {
-    const dynamicFiles = files.reduce((acc, file) => {
+    // COMPILER OVERRIDE: Using explicit iteration instead of generic reduction to prevent SWC parser crash
+    const dynamicFiles: Record<string, string> = {};
+
+    files.forEach((file) => {
       let path = file.name.startsWith("/") ? file.name : `/${file.name}`;
 
       // VITE PROXY: Translate Next.js App Router to Vite's root App.tsx
@@ -179,12 +182,11 @@ export const LivePreview = () => {
       }
       // Strip layout.tsx completely as Vite mounts directly to index.html
       if (path === "/app/layout.tsx") {
-        return acc;
+        return;
       }
 
-      acc[path] = file.content;
-      return acc;
-    }, {} as Record<string, string>);
+      dynamicFiles[path] = file.content;
+    });
 
     return { ...BASE_FILES, ...dynamicFiles };
   }, [files]);
@@ -257,4 +259,13 @@ export const LivePreview = () => {
           ) : (
             <div className="flex flex-col items-center justify-center w-full h-full text-zinc-500 font-mono text-xs gap-3 bg-zinc-950">
                <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center border border-white/5 shadow-inner">
-                 <Smartphone className="w-5 h-5 text-zinc
+                 <Smartphone className="w-5 h-5 text-zinc-600" />
+               </div>
+               Awaiting Build Payload...
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
