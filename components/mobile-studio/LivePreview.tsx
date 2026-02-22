@@ -11,8 +11,9 @@ import { useFileStore } from "@/store/useFileStore";
 import { Loader2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// PREMIUM INFRASTRUCTURE: Vite/React-TS Configuration
 const BASE_FILES = {
-  "/styles/globals.css": `
+  "/styles.css": `
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -24,17 +25,11 @@ body {
   overflow-x: hidden;
 }
   `,
-  "/pages/_app.tsx": `
-import '../styles/globals.css';
-export default function MyApp({ Component, pageProps }) {
-  return <Component {...pageProps} />
-}
-  `,
   "/tailwind.config.js": `
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: { extend: {} },
@@ -75,7 +70,7 @@ export const LivePreview = () => {
   // HARDWARE DETECTION: Listen to device orientation changes
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
+
     const mediaQuery = window.matchMedia("(orientation: landscape)");
     setIsLandscape(mediaQuery.matches);
 
@@ -91,12 +86,14 @@ export const LivePreview = () => {
     const dynamicFiles = files.reduce((acc, file) => {
       let path = file.name.startsWith("/") ? file.name : `/${file.name}`;
 
+      // VITE PROXY: Translate Next.js App Router to Vite's root App.tsx
       if (path === "/app/page.tsx" || path === "/app/page.jsx") {
-        path = "/pages/index.tsx";
+        path = "/App.tsx";
       }
       if (path === "/app/globals.css") {
-        path = "/styles/globals.css"; 
+        path = "/styles.css"; 
       }
+      // Strip layout.tsx completely as Vite mounts directly to index.html
       if (path === "/app/layout.tsx") {
         return acc;
       }
@@ -108,11 +105,12 @@ export const LivePreview = () => {
     return { ...BASE_FILES, ...dynamicFiles };
   }, [files]);
 
-  const hasEntryPoint = Object.keys(sandpackFiles).some(path => path.includes("index.tsx") || path.includes("page.tsx"));
+  // Safety Gate: Ensure we have the App.tsx entry point before booting
+  const hasEntryPoint = Object.keys(sandpackFiles).some(path => path.includes("App.tsx") || path.includes("page.tsx"));
 
   return (
     <div className="relative w-full h-full bg-black flex flex-col items-center justify-center p-4">
-      
+
       {/* 1. COMPILING OVERLAY */}
       <div 
         className={cn(
@@ -146,8 +144,8 @@ export const LivePreview = () => {
         )}>
           {hasEntryPoint ? (
             <SandpackProvider
-              template="nextjs"
-              theme="light" // Apps usually default to light backgrounds unless specified
+              template="react-ts" // TRUE VITE ENGINE SWAP
+              theme="light"
               files={sandpackFiles}
               customSetup={{
                 dependencies: {
@@ -167,6 +165,7 @@ export const LivePreview = () => {
                   showOpenInCodeSandbox={false}
                   showRefreshButton={false}
                   showSandpackErrorOverlay={false}
+                  showNavigator={false} // ANNIHILATES THE LOCALHOST BAR
                 />
               </SandpackLayout>
             </SandpackProvider>
