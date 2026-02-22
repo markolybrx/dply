@@ -21,6 +21,9 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
   const [userToggled, setUserToggled] = useState<Record<number, boolean>>({});
   const [visibleLogCount, setVisibleLogCount] = useState(0);
   const processedFiles = useRef<Set<string>>(new Set());
+  
+  // STALL DETECTOR: Tracks if the AI has hung or is processing heavy logic
+  const [isStalled, setIsStalled] = useState(false);
 
   const parsedData = useMemo(() => {
     if (!isAi) return { cleanContent: content, logs: [], updates: [], activeFile: null };
@@ -74,6 +77,19 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
     };
   }, [content, isAi]);
 
+  // STALL DETECTOR QUEUE: Watch for stream hangs or heavy processing delays
+  useEffect(() => {
+    if (!isAi) return;
+    setIsStalled(false); // Reset the stall state whenever new tokens arrive
+    
+    // If the stream hasn't grown in 8 seconds, flag it as stalled
+    const stallTimer = setTimeout(() => {
+      setIsStalled(true);
+    }, 8000);
+    
+    return () => clearTimeout(stallTimer);
+  }, [content, isAi]);
+
   // LABOR ILLUSION QUEUE: Dynamic weight-based delay
   useEffect(() => {
     if (isAi && parsedData.logs.length > visibleLogCount) {
@@ -81,9 +97,7 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
 
       if (visibleLogCount > 0) {
         const prevLog = parsedData.logs[visibleLogCount - 1];
-        // Identify heavy coding phases vs quick structural reviews
         const isHeavyWork = prevLog.title.toLowerCase().match(/implement|architect|refin/);
-        // 5 to 10 seconds for heavy logic, 2 seconds for reviews
         delay = isHeavyWork ? Math.floor(Math.random() * 5000) + 5000 : 2000;
       }
 
@@ -95,6 +109,7 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
     }
   }, [parsedData.logs.length, visibleLogCount, isAi]);
 
+  // DB SYNCHRONIZATION
   useEffect(() => {
     if (isAi && parsedData.updates.length > 0 && projectId) {
       parsedData.updates.forEach((update) => {
@@ -110,7 +125,7 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
   
   // Extract the title of the log currently being worked on
   const activeLogTitle = visibleLogCount > 0 && parsedData.logs[visibleLogCount - 1] 
-    ? parsedData.logs[visibleLogCount - 1].title 
+    ? (isStalled ? "Processing Heavy Logic" : parsedData.logs[visibleLogCount - 1].title)
     : "Executing Protocol";
 
   return (
@@ -136,6 +151,21 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
           </div>
         )}
 
+        {/* HOISTED: CLEAN CONVERSATIONAL TEXT NOW APPEARS ABOVE ACCORDIONS */}
+        {(parsedData.cleanContent || role === "user") && !isThinking && (
+          <div className={cn(
+            "rounded-2xl p-4 text-sm leading-relaxed shadow-sm break-words",
+            role === "user" 
+              ? "bg-white text-black rounded-tr-sm" 
+              : "bg-zinc-900 text-zinc-300 rounded-tl-sm border border-white/5 mb-2"
+          )}>
+            <div className="prose prose-invert prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 max-w-none">
+              <ReactMarkdown>{parsedData.cleanContent}</ReactMarkdown>
+            </div>
+          </div>
+        )}
+
+        {/* STAGGERED ACCORDION LOGS */}
         {parsedData.logs.slice(0, visibleLogCount).map((log, index) => {
            const isLastVisible = index === visibleLogCount - 1;
            const isWorking = isLastVisible && (!log.isComplete || visibleLogCount < parsedData.logs.length);
@@ -149,15 +179,15 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
               >
                 <div className="flex items-center gap-3 overflow-hidden">
                   {isWorking ? (
-                    <Loader className="w-3 h-3 text-blue-400 animate-spin shrink-0" />
+                    <Loader className={cn("w-3 h-3 animate-spin shrink-0", isStalled ? "text-amber-400" : "text-blue-400")} />
                   ) : (
                     <Check className="w-3 h-3 text-green-500 shrink-0" />
                   )}
                   <span className={cn(
                     "text-[10px] font-mono uppercase tracking-widest truncate",
-                    isWorking ? "text-blue-400" : "text-zinc-400"
+                    isWorking ? (isStalled ? "text-amber-400" : "text-blue-400") : "text-zinc-400"
                   )}>
-                    {log.title}
+                    {isWorking && isStalled ? "Still working on the codes, hold on..." : log.title}
                   </span>
                 </div>
                 <ChevronDown className={cn(
@@ -178,14 +208,15 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
         {/* DYNAMIC WRITING CODE CURSOR */}
         {parsedData.activeFile && (
            <div className="flex items-center gap-2 p-3 mt-1 bg-gradient-to-r from-black/60 to-indigo-900/10 border border-indigo-500/20 rounded-lg w-fit shadow-[0_0_15px_rgba(99,102,241,0.1)]">
-             <Terminal className="w-3.5 h-3.5 text-indigo-400" />
-             <span className="text-[10px] font-mono text-indigo-300 tracking-wider">
+             <Terminal className={cn("w-3.5 h-3.5", isStalled ? "text-amber-400" : "text-indigo-400")} />
+             <span className={cn("text-[10px] font-mono tracking-wider", isStalled ? "text-amber-300" : "text-indigo-300")}>
                {activeLogTitle} <span className="text-white opacity-70">({parsedData.activeFile})</span>
              </span>
-             <div className="w-1.5 h-3 bg-indigo-400 ml-1 animate-[ping_1s_steps(1)_infinite]" />
+             <div className={cn("w-1.5 h-3 ml-1 animate-[ping_1s_steps(1)_infinite]", isStalled ? "bg-amber-400" : "bg-indigo-400")} />
            </div>
         )}
 
+        {/* COMPLETED FILE BADGES */}
         {parsedData.updates.length > 0 && (
           <div className="flex flex-wrap gap-2 my-1">
             {parsedData.updates.map((update, i) => (
@@ -196,19 +227,6 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
                 </span>
               </div>
             ))}
-          </div>
-        )}
-
-        {(parsedData.cleanContent || role === "user") && !isThinking && (
-          <div className={cn(
-            "rounded-2xl p-4 text-sm leading-relaxed shadow-sm break-words",
-            role === "user" 
-              ? "bg-white text-black rounded-tr-sm" 
-              : "bg-zinc-900 text-zinc-300 rounded-tl-sm border border-white/5"
-          )}>
-            <div className="prose prose-invert prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 max-w-none">
-              <ReactMarkdown>{parsedData.cleanContent}</ReactMarkdown>
-            </div>
           </div>
         )}
       </div>
