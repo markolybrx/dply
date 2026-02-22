@@ -43,6 +43,33 @@ module.exports = {
     autoprefixer: {},
   },
 }
+  `,
+  // INJECTED TSCONFIG: Translates Next.js @/ aliases to Vite root paths
+  "/tsconfig.json": `
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": false,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"]
+}
   `
 };
 
@@ -59,6 +86,63 @@ const SandpackBootMask = () => {
       <span className="text-[10px] font-mono text-zinc-500 tracking-[0.2em] uppercase animate-pulse">
         Mounting OS...
       </span>
+    </div>
+  );
+};
+
+// THE AUTO-FIX INTERCEPTOR
+const SandpackErrorHandler = () => {
+  const { sandpack } = useSandpack();
+  const [isFixing, setIsFixing] = useState(false);
+
+  // Only mount if the engine has physically crashed
+  if (sandpack.status !== "error") return null;
+
+  const handleAutoFix = () => {
+    setIsFixing(true);
+    
+    // Extract the raw trace and beam it to the ChatInterface via a global window event
+    const errorMessage = sandpack.error?.message || "Unknown compilation error in Sandpack engine.";
+    window.dispatchEvent(new CustomEvent("DPLY_AUTO_FIX", { 
+      detail: { error: errorMessage } 
+    }));
+
+    // Reset visual state after 3 seconds in case the network request is still pending
+    setTimeout(() => setIsFixing(false), 3000);
+  };
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/95 backdrop-blur-md p-6 text-center">
+      <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-4 border border-red-500/20 shadow-inner">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+          <path d="M12 9v4"/>
+          <path d="M12 17h.01"/>
+        </svg>
+      </div>
+      <p className="text-sm text-red-300 font-mono mb-8">System compilation failed.</p>
+      
+      <button
+        onClick={handleAutoFix}
+        disabled={isFixing}
+        className="flex items-center gap-3 px-6 py-3 bg-zinc-900 border border-white/10 rounded-full shadow-2xl hover:bg-zinc-800 hover:border-white/20 transition-all text-white font-mono text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isFixing ? (
+          <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-400">
+            <path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.21 1.21 0 0 0 0-1.72Z"/>
+            <path d="m14 7 3 3"/>
+            <path d="M5 6v4"/>
+            <path d="M19 14v4"/>
+            <path d="M10 2v2"/>
+            <path d="M7 8H3"/>
+            <path d="M21 16h-4"/>
+            <path d="M11 3H9"/>
+          </svg>
+        )}
+        {isFixing ? "Initializing Auto-Fix..." : "Auto Fix"}
+      </button>
     </div>
   );
 };
@@ -160,6 +244,7 @@ export const LivePreview = () => {
             >
               <SandpackLayout className="h-full w-full !rounded-none !border-0 bg-transparent relative">
                 <SandpackBootMask />
+                <SandpackErrorHandler />
                 <SandpackPreview 
                   className="h-full w-full bg-white" 
                   showOpenInCodeSandbox={false}
@@ -172,13 +257,4 @@ export const LivePreview = () => {
           ) : (
             <div className="flex flex-col items-center justify-center w-full h-full text-zinc-500 font-mono text-xs gap-3 bg-zinc-950">
                <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center border border-white/5 shadow-inner">
-                 <Smartphone className="w-5 h-5 text-zinc-600" />
-               </div>
-               Awaiting Build Payload...
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
+                 <Smartphone className="w-5 h-5 text-zinc
