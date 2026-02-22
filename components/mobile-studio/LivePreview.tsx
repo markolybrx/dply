@@ -72,7 +72,7 @@ export const LivePreview = () => {
   // Map internal file state and merge it with our silent infrastructure
   const sandpackFiles = useMemo(() => {
     const dynamicFiles = files.reduce((acc, file) => {
-      const path = file.name.startsWith("/") ? file.name : \`/\${file.name}\`;
+      const path = file.name.startsWith("/") ? file.name : `/${file.name}`;
       acc[path] = file.content;
       return acc;
     }, {} as Record<string, string>);
