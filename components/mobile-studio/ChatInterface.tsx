@@ -41,11 +41,11 @@ export const ChatInterface = () => {
     const handleAutoFix = (e: Event) => {
       const event = e as CustomEvent<{ error: string }>;
       const errorMessage = event.detail.error;
-      
-      // Fire the hidden prompt to force the AI to repair its own code
+
+      // Fire the hidden prompt with STRICT formatting rules to trigger the file parser
       append({
         role: "user",
-        content: `SYSTEM_DEBUG: The compiler crashed. Analyze this exact error trace and rewrite the file to fix it:\n\n${errorMessage}\n\nDo not apologize. Do not explain. Just output the corrected raw code.`
+        content: `SYSTEM_DEBUG: The compiler crashed. Analyze this error trace and fix the code:\n\n${errorMessage}\n\nYou MUST output the corrected code wrapped in a markdown block with the exact file path (e.g., \`\`\`tsx app/page.tsx\n[code]\n\`\`\`). Do not apologize. Do not explain. Output nothing but the markdown block.`
       });
     };
 
@@ -53,11 +53,21 @@ export const ChatInterface = () => {
     return () => window.removeEventListener("DPLY_AUTO_FIX", handleAutoFix);
   }, [append]);
 
-  // FILTER: Hide ALL our programmatic system prompts from the user's view
-  const visibleMessages = messages.filter(msg => 
-    !msg.content.startsWith("SYSTEM_CONTINUE:") && 
-    !msg.content.startsWith("SYSTEM_DEBUG:")
-  );
+  // FILTER: Hide programmatic system prompts AND the AI's direct responses to them
+  const visibleMessages = messages.filter((msg, index, array) => {
+    const isHiddenPrompt = msg.content.startsWith("SYSTEM_CONTINUE:") || msg.content.startsWith("SYSTEM_DEBUG:");
+    if (isHiddenPrompt) return false;
+
+    // Look-back check: If this is an assistant message, check if it's replying to a hidden prompt
+    if (msg.role === "assistant" && index > 0) {
+      const prevMsg = array[index - 1];
+      if (prevMsg.role === "user" && (prevMsg.content.startsWith("SYSTEM_CONTINUE:") || prevMsg.content.startsWith("SYSTEM_DEBUG:"))) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   return (
     <div className="flex flex-col h-full w-full bg-black">
