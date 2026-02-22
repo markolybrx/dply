@@ -95,8 +95,8 @@ const SandpackErrorHandler = () => {
   const { sandpack } = useSandpack();
   const [isFixing, setIsFixing] = useState(false);
 
-  // Only mount if the engine has physically crashed
-  if (sandpack.status !== "error") return null;
+  // TYPE CORRECTION: Only mount if the engine has physically crashed and generated an error object
+  if (!sandpack.error) return null;
 
   const handleAutoFix = () => {
     setIsFixing(true);
