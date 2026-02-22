@@ -37,21 +37,22 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    // THE CONTEXT TRUNCATOR: Aggressively slice the history to the last 6 messages.
-    // This prevents token bloat, speeds up response times, and protects the free tier quota.
-    const optimizedMessages = messages.slice(-6);
+    // ULTRA-AGGRESSIVE TRUNCATION: Only the last 4 messages.
+    // This prevents token bloat and significantly reduces the weight of any retry attempts.
+    const optimizedMessages = messages.slice(-4);
 
     const result = await streamText({
-      // Call the custom instance we created above
-      model: google("gemini-2.5-flash"),
+      // Call the upgraded Gemini 3 Flash engine
+      model: google("gemini-3-flash"),
       system: SYSTEM_INSTRUCTION,
       messages: optimizedMessages,
-      temperature: 0.4,
-      maxTokens: 8000,
+      temperature: 0.2,
+      maxTokens: 4000,
     });
 
     return result.toDataStreamResponse();
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    // Return a strict 429 status to prevent the frontend from looping blind retries
+    return new Response(JSON.stringify({ error: "API_QUOTA_REACHED" }), { status: 429 });
   }
 }
