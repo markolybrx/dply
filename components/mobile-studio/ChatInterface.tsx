@@ -40,7 +40,12 @@ export const ChatInterface = () => {
   useEffect(() => {
     const handleAutoFix = (e: Event) => {
       const event = e as CustomEvent<{ error: string }>;
-      const errorMessage = event.detail.error;
+      const rawError = event.detail.error;
+
+      // DEFENSIVE SHIELD: Truncate massive error logs to prevent API payload crashes
+      const errorMessage = rawError.length > 2000 
+        ? rawError.substring(0, 2000) + "\n...[TRUNCATED TO PREVENT TOKEN OVERFLOW]" 
+        : rawError;
 
       // Fire the hidden prompt with STRICT formatting rules to trigger the file parser
       append({
@@ -111,12 +116,16 @@ export const ChatInterface = () => {
         {/* ERROR STATE UI */}
         {error && (
           <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 mt-4">
-            <AlertCircle className="w-5 h-5 text-red-400" />
-            <div className="flex-1">
+            <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+            <div className="flex-1 min-w-0">
               <p className="text-xs text-red-300 font-mono">Connection Failed</p>
+              {/* MOBILE DEBUG OVERRIDE: Print the exact API crash trace directly to the screen */}
+              <p className="text-[10px] text-red-400/80 mt-1 font-mono break-words">
+                {error.message}
+              </p>
               <button 
                 onClick={() => reload()} 
-                className="text-[10px] text-red-400 underline mt-1 hover:text-red-300 transition-colors"
+                className="text-[10px] text-red-400 underline mt-2 hover:text-red-300 transition-colors"
               >
                 Retry Request
               </button>
