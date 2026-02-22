@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { useChat } from "ai/react";
-import { Send, Sparkles, StopCircle, AlertCircle } from "lucide-react";
+import { Send, Sparkles, StopCircle, AlertCircle, Loader2 } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import { useToastStore } from "@/store/useToastStore";
 
@@ -17,10 +17,22 @@ export const ChatInterface = () => {
   });
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [isDebugging, setIsDebugging] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, error]);
+
+  // THE GLOBAL LOCK: Broadcast generation status to prevent UI cross-contamination
+  useEffect(() => {
+    if (!isLoading) {
+      setIsDebugging(false); // Reset debug state when generation finishes
+    }
+    
+    window.dispatchEvent(new CustomEvent("DPLY_GENERATION_STATUS", {
+      detail: { isGenerating: isLoading }
+    }));
+  }, [isLoading]);
 
   const onSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +53,8 @@ export const ChatInterface = () => {
     const handleAutoFix = (e: Event) => {
       const event = e as CustomEvent<{ error: string }>;
       const rawError = event.detail.error;
+
+      setIsDebugging(true);
 
       // DEFENSIVE SHIELD: Truncate massive error logs to prevent API payload crashes
       const errorMessage = rawError.length > 2000 
@@ -75,7 +89,30 @@ export const ChatInterface = () => {
   });
 
   return (
-    <div className="flex flex-col h-full w-full bg-black">
+    <div className="flex flex-col h-full w-full bg-black relative overflow-hidden">
+      
+      {/* THE RATE LIMIT SHIELD: Glassmorphic UI Lock */}
+      {isLoading && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/80 backdrop-blur-md transition-all duration-300">
+          <div className="w-16 h-16 relative flex items-center justify-center mb-6">
+            <div className="absolute inset-0 rounded-full border-t-2 border-indigo-500 animate-spin"></div>
+            <Sparkles className="w-6 h-6 text-indigo-400 animate-pulse" />
+          </div>
+          <p className="text-xs font-mono text-indigo-300 tracking-[0.2em] uppercase animate-pulse text-center px-6">
+            {isDebugging ? "Debugging System Architecture..." : "Synthesizing Code Payload..."}
+          </p>
+          <p className="text-[10px] text-zinc-500 font-mono mt-4 text-center px-8">
+            System locked to prevent API rate limit overflow.
+          </p>
+          <button
+            onClick={() => stop()}
+            className="mt-8 flex items-center gap-2 px-5 py-2.5 bg-red-500/10 text-red-400 rounded-full text-xs font-mono border border-red-500/20 hover:bg-red-500/20 transition-colors"
+          >
+            <StopCircle className="w-4 h-4" /> Force Stop
+          </button>
+        </div>
+      )}
+
       {/* 1. Chat History */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {visibleMessages.length === 0 && !error && (
@@ -95,23 +132,6 @@ export const ChatInterface = () => {
             onTruncate={handleTruncate}
           />
         ))}
-
-        {/* OPTIMISTIC ZERO-LATENCY LOADING STATE */}
-        {isLoading && visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1].role === "user" && (
-          <div className="flex w-full gap-3 mb-6 justify-start">
-            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 mt-1 border border-white/5">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="relative flex flex-col gap-2 w-full max-w-[90%] items-start">
-              <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-zinc-900 to-indigo-900/10 border border-white/5 rounded-lg w-fit animate-pulse">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="text-[10px] font-mono uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300">
-                  Analyzing Request...
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ERROR STATE UI */}
         {error && (
@@ -137,13 +157,14 @@ export const ChatInterface = () => {
       </div>
 
       {/* 2. Input Area */}
-      <div className="shrink-0 p-4 bg-zinc-900/50 border-t border-white/5">
+      <div className="shrink-0 p-4 bg-zinc-900/50 border-t border-white/5 relative z-40">
         <form onSubmit={onSend} className="relative flex items-center">
           <input
             value={input}
             onChange={handleInputChange}
+            disabled={isLoading}
             placeholder="Ask AI to change something..."
-            className="w-full bg-black border border-white/10 rounded-full pl-5 pr-12 py-3 text-sm text-zinc-200 focus:outline-none focus:border-white/20 placeholder:text-zinc-600"
+            className="w-full bg-black border border-white/10 rounded-full pl-5 pr-12 py-3 text-sm text-zinc-200 focus:outline-none focus:border-white/20 placeholder:text-zinc-600 disabled:opacity-50"
           />
 
           <button 
@@ -151,7 +172,7 @@ export const ChatInterface = () => {
             disabled={!input.trim() && !isLoading}
             className="absolute right-2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? <StopCircle className="w-4 h-4 animate-pulse" onClick={stop} /> : <Send className="w-4 h-4" />}
+            <Send className="w-4 h-4" />
           </button>
         </form>
       </div>
