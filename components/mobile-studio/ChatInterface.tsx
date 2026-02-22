@@ -7,9 +7,8 @@ import { MessageBubble } from "./MessageBubble";
 import { useToastStore } from "@/store/useToastStore";
 
 export const ChatInterface = () => {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, stop, error, reload } = useChat({
-    // STRICT PROTOCOL: Explicitly define the endpoint and force the data stream format 
-    // to prevent mobile browser network buffering.
+  // Extract 'append' to programmatically send hidden continuation prompts
+  const { messages, input, handleInputChange, handleSubmit, isLoading, stop, error, reload, append } = useChat({
     api: "/api/chat",
     streamProtocol: "data",
     onError: (err) => {
@@ -19,7 +18,6 @@ export const ChatInterface = () => {
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages or errors arrive
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, error]);
@@ -30,27 +28,41 @@ export const ChatInterface = () => {
     handleSubmit(e);
   };
 
+  // AUTO-CONTINUATION: Fire a hidden prompt to the AI to resume the code
+  const handleTruncate = (fileName: string) => {
+    append({
+      role: "user",
+      content: `SYSTEM_CONTINUE: You were cut off due to server limits. Continue exactly where you left off for FILE: ${fileName}. Do NOT apologize. Do NOT write markdown codeblocks. Just start immediately with the next line of RAW code.`
+    });
+  };
+
+  // FILTER: Hide our programmatic system prompts from the user's view
+  const visibleMessages = messages.filter(msg => !msg.content.startsWith("SYSTEM_CONTINUE:"));
+
   return (
     <div className="flex flex-col h-full w-full bg-black">
       {/* 1. Chat History */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {messages.length === 0 && !error && (
+        {visibleMessages.length === 0 && !error && (
           <div className="h-full flex flex-col items-center justify-center text-zinc-500 opacity-50">
             <Sparkles className="w-8 h-8 mb-3" />
             <p className="text-xs font-mono">Ready to build.</p>
           </div>
         )}
 
-        {messages.map((msg) => (
+        {visibleMessages.map((msg, index) => (
           <MessageBubble 
             key={msg.id} 
             role={msg.role as "user" | "assistant" | "system"} 
             content={msg.content} 
+            // Only the absolute last message in the array can actively stream
+            isStreaming={isLoading && index === visibleMessages.length - 1}
+            onTruncate={handleTruncate}
           />
         ))}
 
         {/* OPTIMISTIC ZERO-LATENCY LOADING STATE */}
-        {isLoading && messages.length > 0 && messages[messages.length - 1].role === "user" && (
+        {isLoading && visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1].role === "user" && (
           <div className="flex w-full gap-3 mb-6 justify-start">
             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 mt-1 border border-white/5">
               <Sparkles className="w-4 h-4 text-indigo-400" />
@@ -82,7 +94,6 @@ export const ChatInterface = () => {
           </div>
         )}
 
-        {/* Invisible element to scroll to */}
         <div ref={bottomRef} />
       </div>
 
