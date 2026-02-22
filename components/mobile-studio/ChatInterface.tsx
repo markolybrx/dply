@@ -49,6 +49,23 @@ export const ChatInterface = () => {
           />
         ))}
 
+        {/* OPTIMISTIC ZERO-LATENCY LOADING STATE */}
+        {isLoading && messages.length > 0 && messages[messages.length - 1].role === "user" && (
+          <div className="flex w-full gap-3 mb-6 justify-start">
+            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 mt-1 border border-white/5">
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+            </div>
+            <div className="relative flex flex-col gap-2 w-full max-w-[90%] items-start">
+              <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-zinc-900 to-indigo-900/10 border border-white/5 rounded-lg w-fit animate-pulse">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300">
+                  Analyzing Request...
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ERROR STATE UI */}
         {error && (
           <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 mt-4">
