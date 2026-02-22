@@ -37,11 +37,15 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
+    // THE CONTEXT TRUNCATOR: Aggressively slice the history to the last 6 messages.
+    // This prevents token bloat, speeds up response times, and protects the free tier quota.
+    const optimizedMessages = messages.slice(-6);
+
     const result = await streamText({
       // Call the custom instance we created above
       model: google("gemini-2.5-flash"),
       system: SYSTEM_INSTRUCTION,
-      messages,
+      messages: optimizedMessages,
       temperature: 0.4,
       maxTokens: 8000,
     });
