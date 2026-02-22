@@ -7,7 +7,7 @@ import { MessageBubble } from "./MessageBubble";
 import { useToastStore } from "@/store/useToastStore";
 
 export const ChatInterface = () => {
-  // Extract 'append' to programmatically send hidden continuation prompts
+  // Extract 'append' to programmatically send hidden continuation and debug prompts
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop, error, reload, append } = useChat({
     api: "/api/chat",
     streamProtocol: "data",
@@ -36,8 +36,28 @@ export const ChatInterface = () => {
     });
   };
 
-  // FILTER: Hide our programmatic system prompts from the user's view
-  const visibleMessages = messages.filter(msg => !msg.content.startsWith("SYSTEM_CONTINUE:"));
+  // THE SELF-HEALING LOOP: Listen for crash reports from the Live Preview engine
+  useEffect(() => {
+    const handleAutoFix = (e: Event) => {
+      const event = e as CustomEvent<{ error: string }>;
+      const errorMessage = event.detail.error;
+      
+      // Fire the hidden prompt to force the AI to repair its own code
+      append({
+        role: "user",
+        content: `SYSTEM_DEBUG: The compiler crashed. Analyze this exact error trace and rewrite the file to fix it:\n\n${errorMessage}\n\nDo not apologize. Do not explain. Just output the corrected raw code.`
+      });
+    };
+
+    window.addEventListener("DPLY_AUTO_FIX", handleAutoFix);
+    return () => window.removeEventListener("DPLY_AUTO_FIX", handleAutoFix);
+  }, [append]);
+
+  // FILTER: Hide ALL our programmatic system prompts from the user's view
+  const visibleMessages = messages.filter(msg => 
+    !msg.content.startsWith("SYSTEM_CONTINUE:") && 
+    !msg.content.startsWith("SYSTEM_DEBUG:")
+  );
 
   return (
     <div className="flex flex-col h-full w-full bg-black">
