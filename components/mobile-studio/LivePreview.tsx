@@ -144,7 +144,6 @@ export const LivePreview = () => {
                 showOpenInCodeSandbox={false}
                 showRefreshButton={false}
                 showSandpackErrorOverlay={false}
-                showLoadingScreen={false}
               />
             </SandpackLayout>
           </SandpackProvider>
