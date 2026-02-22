@@ -10,9 +10,11 @@ import { useParams } from "next/navigation";
 interface MessageBubbleProps {
   role: "user" | "assistant" | "system";
   content: string;
+  isStreaming?: boolean;
+  onTruncate?: (fileName: string) => void;
 }
 
-export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
+export const MessageBubble = ({ role, content, isStreaming = false, onTruncate }: MessageBubbleProps) => {
   const isAi = role === "assistant";
   const { updateFile } = useFileStore();
   const params = useParams();
@@ -22,15 +24,24 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
   const [visibleLogCount, setVisibleLogCount] = useState(0);
   const processedFiles = useRef<Set<string>>(new Set());
   
+  // SECURE: Ensure we only fire the continuation trigger once per truncation
+  const hasTriggeredTruncate = useRef(false);
+
   // STALL DETECTOR: Tracks if the AI has hung or is processing heavy logic
   const [isStalled, setIsStalled] = useState(false);
 
+  // Combine AI role check with actual network state
+  const isCurrentlyStreaming = isAi && isStreaming;
+
+  // Clean the content of the hidden system prompt if it accidentally bled through
+  const displayContent = content.replace(/^SYSTEM_CONTINUE:.*?\n/, "");
+
   const parsedData = useMemo(() => {
-    if (!isAi) return { cleanContent: content, logs: [], updates: [], activeFile: null };
+    if (!isAi) return { cleanContent: displayContent, logs: [], updates: [], activeFile: null };
 
     const logs: { title: string; desc: string; isComplete: boolean }[] = [];
     const updates: { fileName: string; content: string }[] = [];
-    const lines = content.split("\n");
+    const lines = displayContent.split("\n");
     let cleanLines: string[] = [];
 
     let currentFile: string | null = null;
@@ -75,25 +86,38 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
       updates,
       activeFile: currentFile
     };
-  }, [content, isAi]);
+  }, [displayContent, isAi]);
+
+  // AUTO-CONTINUATION DETECTOR: If stream dies but file is not completed
+  useEffect(() => {
+    if (isAi && !isStreaming && parsedData.activeFile && onTruncate) {
+      if (!hasTriggeredTruncate.current) {
+        hasTriggeredTruncate.current = true;
+        onTruncate(parsedData.activeFile);
+      }
+    }
+  }, [isStreaming, parsedData.activeFile, isAi, onTruncate]);
 
   // STALL DETECTOR QUEUE: Watch for stream hangs or heavy processing delays
   useEffect(() => {
-    if (!isAi) return;
-    setIsStalled(false); // Reset the stall state whenever new tokens arrive
+    if (!isCurrentlyStreaming) {
+      setIsStalled(false);
+      return;
+    }
     
-    // If the stream hasn't grown in 8 seconds, flag it as stalled
+    setIsStalled(false); 
+
     const stallTimer = setTimeout(() => {
       setIsStalled(true);
     }, 8000);
-    
+
     return () => clearTimeout(stallTimer);
-  }, [content, isAi]);
+  }, [displayContent, isCurrentlyStreaming]);
 
   // LABOR ILLUSION QUEUE: Dynamic weight-based delay
   useEffect(() => {
     if (isAi && parsedData.logs.length > visibleLogCount) {
-      let delay = 2000; // Base 2 seconds
+      let delay = 2000; 
 
       if (visibleLogCount > 0) {
         const prevLog = parsedData.logs[visibleLogCount - 1];
@@ -104,7 +128,7 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
       const timer = setTimeout(() => {
         setVisibleLogCount((prev) => prev + 1);
       }, delay);
-      
+
       return () => clearTimeout(timer);
     }
   }, [parsedData.logs.length, visibleLogCount, isAi]);
@@ -121,9 +145,8 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
     }
   }, [parsedData.updates, isAi, updateFile, projectId]);
 
-  const isThinking = isAi && content.length < 15 && parsedData.logs.length === 0;
-  
-  // Extract the title of the log currently being worked on
+  const isThinking = isCurrentlyStreaming && displayContent.length < 15 && parsedData.logs.length === 0;
+
   const activeLogTitle = visibleLogCount > 0 && parsedData.logs[visibleLogCount - 1] 
     ? (isStalled ? "Processing Heavy Logic" : parsedData.logs[visibleLogCount - 1].title)
     : "Executing Protocol";
@@ -178,16 +201,16 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
                 className="w-full flex items-center justify-between p-3.5 hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center gap-3 overflow-hidden">
-                  {isWorking ? (
+                  {isWorking && isCurrentlyStreaming ? (
                     <Loader className={cn("w-3 h-3 animate-spin shrink-0", isStalled ? "text-amber-400" : "text-blue-400")} />
                   ) : (
                     <Check className="w-3 h-3 text-green-500 shrink-0" />
                   )}
                   <span className={cn(
                     "text-[10px] font-mono uppercase tracking-widest truncate",
-                    isWorking ? (isStalled ? "text-amber-400" : "text-blue-400") : "text-zinc-400"
+                    isWorking && isCurrentlyStreaming ? (isStalled ? "text-amber-400" : "text-blue-400") : "text-zinc-400"
                   )}>
-                    {isWorking && isStalled ? "Still working on the codes, hold on..." : log.title}
+                    {isWorking && isCurrentlyStreaming && isStalled ? "Still working on the codes, hold on..." : log.title}
                   </span>
                 </div>
                 <ChevronDown className={cn(
@@ -206,7 +229,7 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
         })}
 
         {/* DYNAMIC WRITING CODE CURSOR */}
-        {parsedData.activeFile && (
+        {parsedData.activeFile && isCurrentlyStreaming && (
            <div className="flex items-center gap-2 p-3 mt-1 bg-gradient-to-r from-black/60 to-indigo-900/10 border border-indigo-500/20 rounded-lg w-fit shadow-[0_0_15px_rgba(99,102,241,0.1)]">
              <Terminal className={cn("w-3.5 h-3.5", isStalled ? "text-amber-400" : "text-indigo-400")} />
              <span className={cn("text-[10px] font-mono tracking-wider", isStalled ? "text-amber-300" : "text-indigo-300")}>
