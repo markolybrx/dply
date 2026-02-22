@@ -8,7 +8,7 @@ import {
   useSandpack
 } from "@codesandbox/sandpack-react";
 import { useFileStore } from "@/store/useFileStore";
-import { Loader2, Smartphone } from "lucide-react";
+import { Loader2, Smartphone, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // PREMIUM INFRASTRUCTURE: Vite/React-TS Configuration
@@ -94,6 +94,18 @@ const SandpackBootMask = () => {
 const SandpackErrorHandler = () => {
   const { sandpack } = useSandpack();
   const [isFixing, setIsFixing] = useState(false);
+  const [isChatGenerating, setIsChatGenerating] = useState(false);
+
+  // THE GLOBAL LOCK: Listen to the ChatInterface to see if the AI is already busy
+  useEffect(() => {
+    const handleStatus = (e: Event) => {
+      const event = e as CustomEvent<{ isGenerating: boolean }>;
+      setIsChatGenerating(event.detail.isGenerating);
+    };
+
+    window.addEventListener("DPLY_GENERATION_STATUS", handleStatus);
+    return () => window.removeEventListener("DPLY_GENERATION_STATUS", handleStatus);
+  }, []);
 
   // TYPE CORRECTION: Only mount if the engine has physically crashed and generated an error object
   if (!sandpack.error) return null;
@@ -124,11 +136,18 @@ const SandpackErrorHandler = () => {
 
       <button
         onClick={handleAutoFix}
-        disabled={isFixing}
-        className="flex items-center gap-3 px-6 py-3 bg-zinc-900 border border-white/10 rounded-full shadow-2xl hover:bg-zinc-800 hover:border-white/20 transition-all text-white font-mono text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isFixing || isChatGenerating}
+        className={cn(
+          "flex items-center gap-3 px-6 py-3 bg-zinc-900 border rounded-full shadow-2xl transition-all text-white font-mono text-xs",
+          isFixing || isChatGenerating
+            ? "border-white/5 opacity-50 cursor-not-allowed"
+            : "border-white/10 hover:bg-zinc-800 hover:border-white/20"
+        )}
       >
         {isFixing ? (
           <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+        ) : isChatGenerating ? (
+          <AlertCircle className="w-4 h-4 text-zinc-500" />
         ) : (
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-400">
             <path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.21 1.21 0 0 0 0-1.72Z"/>
@@ -141,7 +160,7 @@ const SandpackErrorHandler = () => {
             <path d="M11 3H9"/>
           </svg>
         )}
-        {isFixing ? "Initializing Auto-Fix..." : "Auto Fix"}
+        {isFixing ? "Initializing Auto-Fix..." : isChatGenerating ? "System Locked" : "Auto Fix"}
       </button>
     </div>
   );
