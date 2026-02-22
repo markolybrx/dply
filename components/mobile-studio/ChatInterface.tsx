@@ -7,13 +7,16 @@ import { MessageBubble } from "./MessageBubble";
 import { useToastStore } from "@/store/useToastStore";
 
 export const ChatInterface = () => {
-  // Added error and reload for robust API failure handling
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop, error, reload } = useChat({
+    // STRICT PROTOCOL: Explicitly define the endpoint and force the data stream format 
+    // to prevent mobile browser network buffering.
+    api: "/api/chat",
+    streamProtocol: "data",
     onError: (err) => {
       console.error("Chat API Error:", err);
     }
   });
-  
+
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages or errors arrive
