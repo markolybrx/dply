@@ -11,6 +11,7 @@ export const ChatInterface = () => {
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop, error, reload, append } = useChat({
     api: "/api/chat",
     streamProtocol: "data",
+    maxRetries: 0, // THE KILL SWITCH: Prevents the SDK from secretly spamming the API on failure
     onError: (err) => {
       console.error("Chat API Error:", err);
     }
@@ -28,7 +29,7 @@ export const ChatInterface = () => {
     if (!isLoading) {
       setIsDebugging(false); // Reset debug state when generation finishes
     }
-    
+
     window.dispatchEvent(new CustomEvent("DPLY_GENERATION_STATUS", {
       detail: { isGenerating: isLoading }
     }));
@@ -90,7 +91,7 @@ export const ChatInterface = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-black relative overflow-hidden">
-      
+
       {/* THE RATE LIMIT SHIELD: Glassmorphic UI Lock */}
       {isLoading && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/80 backdrop-blur-md transition-all duration-300">
@@ -135,21 +136,26 @@ export const ChatInterface = () => {
 
         {/* ERROR STATE UI */}
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 mt-4">
-            <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-red-300 font-mono">Connection Failed</p>
-              {/* MOBILE DEBUG OVERRIDE: Print the exact API crash trace directly to the screen */}
-              <p className="text-[10px] text-red-400/80 mt-1 font-mono break-words">
-                {error.message}
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex flex-col gap-2 mt-4 relative z-40">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+              <p className="text-xs text-red-300 font-mono font-bold uppercase tracking-wide">
+                {error.message.includes("API_QUOTA_REACHED") || error.message.includes("429") || error.message.includes("quota") 
+                  ? "Rate Limit Reached" 
+                  : "Connection Failed"}
               </p>
-              <button 
-                onClick={() => reload()} 
-                className="text-[10px] text-red-400 underline mt-2 hover:text-red-300 transition-colors"
-              >
-                Retry Request
-              </button>
             </div>
+            <p className="text-[10px] text-red-400/80 font-mono leading-relaxed break-words">
+              {error.message.includes("API_QUOTA_REACHED") || error.message.includes("429") || error.message.includes("quota")
+                ? "The Gemini Free Tier is restricted to 5 requests per minute. Your quota has been exhausted. Please wait exactly 60 seconds before issuing the next command."
+                : error.message}
+            </p>
+            <button 
+              onClick={() => reload()} 
+              className="w-full mt-2 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-[10px] font-mono rounded-lg transition-colors border border-red-500/20"
+            >
+              Retry Connection
+            </button>
           </div>
         )}
 
