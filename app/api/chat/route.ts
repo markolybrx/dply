@@ -1,7 +1,12 @@
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText } from "ai";
 
 export const runtime = "edge";
+
+// Initialize the provider and explicitly point it to your Vercel environment variable
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY || "",
+});
 
 const SYSTEM_INSTRUCTION = `
 You are an autonomous AI App Builder. 
@@ -33,6 +38,7 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
 
     const result = await streamText({
+      // Call the custom instance we created above
       model: google("gemini-2.5-flash"),
       system: SYSTEM_INSTRUCTION,
       messages,
