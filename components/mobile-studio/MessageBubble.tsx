@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
-import { User, Sparkles, Check, ChevronDown, Loader, FileCode } from "lucide-react";
+import { User, Sparkles, Check, ChevronDown, Loader, FileCode, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/store/useFileStore";
 import { useParams } from "next/navigation";
@@ -20,11 +20,14 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
 
   const [userToggled, setUserToggled] = useState<Record<number, boolean>>({});
   
-  // SECURE: Track which files have already been committed to the DB for this specific message
+  // UX THROTTLE: Controls how many logs are currently visible to the user
+  const [visibleLogCount, setVisibleLogCount] = useState(0);
+
+  // SECURE: Track which files have already been committed to the DB
   const processedFiles = useRef<Set<string>>(new Set());
 
   const parsedData = useMemo(() => {
-    if (!isAi) return { cleanContent: content, logs: [], updates: [] };
+    if (!isAi) return { cleanContent: content, logs: [], updates: [], activeFile: null };
 
     const logs: { title: string; desc: string; isComplete: boolean }[] = [];
     const updates: { fileName: string; content: string }[] = [];
@@ -70,14 +73,27 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
     return { 
       cleanContent: cleanLines.join("\n").trim(), 
       logs, 
-      updates 
+      updates,
+      activeFile: currentFile // Allows the UI to know the AI is currently "typing" a file
     };
   }, [content, isAi]);
 
+  // LABOR ILLUSION QUEUE: Artificially stagger the reveal of the accordions
+  useEffect(() => {
+    if (isAi && parsedData.logs.length > visibleLogCount) {
+      // 2 seconds for the initial thought, 1.5 seconds for subsequent phases
+      const delay = visibleLogCount === 0 ? 2000 : 1500;
+      const timer = setTimeout(() => {
+        setVisibleLogCount((prev) => prev + 1);
+      }, delay);
+      return () => clearTimeout(timer);
+    }
+  }, [parsedData.logs.length, visibleLogCount, isAi]);
+
+  // DB SYNCHRONIZATION
   useEffect(() => {
     if (isAi && parsedData.updates.length > 0 && projectId) {
       parsedData.updates.forEach((update) => {
-        // STRICT GATE: Only update the database if we haven't already processed this file
         if (!processedFiles.current.has(update.fileName)) {
           updateFile(projectId, update.fileName, update.content);
           processedFiles.current.add(update.fileName);
@@ -85,6 +101,9 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
       });
     }
   }, [parsedData.updates, isAi, updateFile, projectId]);
+
+  // Determines if the AI is still generating the initial response
+  const isThinking = isAi && content.length < 15 && parsedData.logs.length === 0;
 
   return (
     <div className={cn("flex w-full gap-3 mb-6", role === "user" ? "justify-end" : "justify-start")}>
@@ -94,15 +113,26 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
         </div>
       )}
 
-      {/* FIXED: Enforce w-full and a max-width to keep accordions consistent */}
       <div className={cn(
         "relative flex flex-col gap-2 w-full max-w-[90%]", 
         role === "user" ? "items-end" : "items-start"
       )}>
 
-        {parsedData.logs.map((log, index) => {
-           const isLast = index === parsedData.logs.length - 1;
-           const isWorking = isLast && !log.isComplete;
+        {/* INITIAL THINKING ANIMATION */}
+        {isThinking && (
+          <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/5 rounded-lg w-fit">
+            <Loader className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-indigo-300/80 animate-pulse">
+              Analyzing Request...
+            </span>
+          </div>
+        )}
+
+        {/* STAGGERED ACCORDION LOGS */}
+        {parsedData.logs.slice(0, visibleLogCount).map((log, index) => {
+           const isLastVisible = index === visibleLogCount - 1;
+           // It's working if it's the last visible log AND we haven't finished all logs from the backend
+           const isWorking = isLastVisible && (!log.isComplete || visibleLogCount < parsedData.logs.length);
            const isOpen = userToggled[index] !== undefined ? userToggled[index] : isWorking;
 
            return (
@@ -139,6 +169,18 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
           );
         })}
 
+        {/* WRITING CODE CURSOR (Active Generation Phase) */}
+        {parsedData.activeFile && (
+           <div className="flex items-center gap-2 p-3 mt-1 bg-black/40 border border-indigo-500/20 rounded-lg w-fit shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+             <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+             <span className="text-[10px] font-mono text-indigo-300 tracking-wider">
+               Synthesizing <span className="text-white">{parsedData.activeFile}</span>
+             </span>
+             <div className="w-1.5 h-3 bg-indigo-400 ml-1 animate-[ping_1s_steps(1)_infinite]" />
+           </div>
+        )}
+
+        {/* COMPLETED FILE BADGES */}
         {parsedData.updates.length > 0 && (
           <div className="flex flex-wrap gap-2 my-1">
             {parsedData.updates.map((update, i) => (
@@ -152,7 +194,8 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
           </div>
         )}
 
-        {(parsedData.cleanContent || role === "user") && (
+        {/* CLEAN CONVERSATIONAL TEXT */}
+        {(parsedData.cleanContent || role === "user") && !isThinking && (
           <div className={cn(
             "rounded-2xl p-4 text-sm leading-relaxed shadow-sm break-words",
             role === "user" 
