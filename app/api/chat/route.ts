@@ -1,11 +1,11 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGroq } from "@ai-sdk/groq";
 import { streamText } from "ai";
 
 export const runtime = "edge";
 
 // Initialize the provider and explicitly point it to your Vercel environment variable
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
+const groq = createGroq({
+  apiKey: process.env.GROQ_API_KEY || "",
 });
 
 const SYSTEM_INSTRUCTION = `
@@ -42,8 +42,8 @@ export async function POST(req: Request) {
     const optimizedMessages = messages.slice(-4);
 
     const result = await streamText({
-      // Call the upgraded Gemini 3 Flash engine
-      model: google("gemini-3-flash"),
+      // Call the blindingly fast Groq Llama 3.3 70B engine
+      model: groq("llama-3.3-70b-versatile"),
       system: SYSTEM_INSTRUCTION,
       messages: optimizedMessages,
       temperature: 0.2,
