@@ -48,6 +48,7 @@ export async function POST(req: Request) {
       messages: optimizedMessages,
       temperature: 0.2,
       maxTokens: 4000,
+      maxRetries: 0, // THE KILL SWITCH: Stops the server from automatically retrying failed API calls
     });
 
     return result.toDataStreamResponse();
