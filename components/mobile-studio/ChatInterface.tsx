@@ -11,7 +11,6 @@ export const ChatInterface = () => {
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop, error, reload, append } = useChat({
     api: "/api/chat",
     streamProtocol: "data",
-    maxRetries: 0, // THE KILL SWITCH: Prevents the SDK from secretly spamming the API on failure
     onError: (err) => {
       console.error("Chat API Error:", err);
     }
