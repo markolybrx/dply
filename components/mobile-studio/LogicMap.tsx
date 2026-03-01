@@ -8,8 +8,9 @@ import { useParams } from "next/navigation";
 
 export const LogicMap = () => {
   const { files, updateFilePosition } = useFileStore();
+  // Ref established to define the physical boundaries of the map
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // 1. GET THE PROJECT ID
   const params = useParams();
   const projectId = params.projectId as string;
@@ -24,7 +25,7 @@ export const LogicMap = () => {
       }}
     >
       {/* MAP TITLE */}
-      <div className="absolute top-6 left-6 pointer-events-none opacity-50">
+      <div className="absolute top-6 left-6 pointer-events-none opacity-50 z-10">
         <h2 className="text-xs font-bold text-white tracking-widest uppercase mb-1">Logic Map</h2>
         <p className="text-[10px] text-zinc-500 font-mono">
           {files.length} Nodes Active
@@ -37,20 +38,22 @@ export const LogicMap = () => {
           key={file.name}
           drag
           dragMomentum={false}
-          // Use saved position or default to center
+          // Enforce strict boundaries using the parent container
+          dragConstraints={containerRef}
+          // Add a premium 10% elasticity bounce at the edges
+          dragElastic={0.1}
           initial={{ 
             x: file.position?.x || 100, 
             y: file.position?.y || 100 
           }}
-          // Update Store + Database on release
           onDragEnd={(_, info) => {
             if (!containerRef.current) return;
-            
-            // Calculate new position relative to the container
+
+            // Calculate new position relative to the initial drag point
             const newX = (file.position?.x || 100) + info.offset.x;
             const newY = (file.position?.y || 100) + info.offset.y;
 
-            // 2. PASS PROJECT ID TO THE FUNCTION
+            // Update Store + Database on release
             updateFilePosition(projectId, file.name, newX, newY);
           }}
           className="absolute flex flex-col items-center gap-2 cursor-grab active:cursor-grabbing group"
@@ -66,9 +69,9 @@ export const LogicMap = () => {
               </span>
               <Move className="w-3 h-3 text-zinc-600" />
             </div>
-            
+
             {/* Mini Code Preview */}
-            <div className="h-12 w-full bg-zinc-900/50 rounded-lg p-2 overflow-hidden">
+            <div className="h-12 w-full bg-zinc-900/50 rounded-lg p-2 overflow-hidden pointer-events-none">
                <div className="space-y-1 opacity-40">
                   <div className="h-1 w-1/2 bg-zinc-600 rounded-full" />
                   <div className="h-1 w-3/4 bg-zinc-700 rounded-full" />

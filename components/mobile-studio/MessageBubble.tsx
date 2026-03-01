@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
-import { User, Sparkles, Check, ChevronDown, Loader, FileCode } from "lucide-react";
+import { User, Sparkles, Check, ChevronDown, Loader, FileCode, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/store/useFileStore";
 import { useParams } from "next/navigation";
@@ -10,22 +10,38 @@ import { useParams } from "next/navigation";
 interface MessageBubbleProps {
   role: "user" | "assistant" | "system";
   content: string;
+  isStreaming?: boolean;
+  onTruncate?: (fileName: string) => void;
 }
 
-export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
+export const MessageBubble = ({ role, content, isStreaming = false, onTruncate }: MessageBubbleProps) => {
   const isAi = role === "assistant";
   const { updateFile } = useFileStore();
   const params = useParams();
   const projectId = params.projectId as string;
 
   const [userToggled, setUserToggled] = useState<Record<number, boolean>>({});
+  const [visibleLogCount, setVisibleLogCount] = useState(0);
+  const processedFiles = useRef<Set<string>>(new Set());
+  
+  // SECURE: Ensure we only fire the continuation trigger once per truncation
+  const hasTriggeredTruncate = useRef(false);
+
+  // STALL DETECTOR: Tracks if the AI has hung or is processing heavy logic
+  const [isStalled, setIsStalled] = useState(false);
+
+  // Combine AI role check with actual network state
+  const isCurrentlyStreaming = isAi && isStreaming;
+
+  // Clean the content of the hidden system prompt if it accidentally bled through
+  const displayContent = content.replace(/^SYSTEM_CONTINUE:.*?\n/, "");
 
   const parsedData = useMemo(() => {
-    if (!isAi) return { cleanContent: content, logs: [], updates: [] };
+    if (!isAi) return { cleanContent: displayContent, logs: [], updates: [], activeFile: null };
 
     const logs: { title: string; desc: string; isComplete: boolean }[] = [];
     const updates: { fileName: string; content: string }[] = [];
-    const lines = content.split("\n");
+    const lines = displayContent.split("\n");
     let cleanLines: string[] = [];
 
     let currentFile: string | null = null;
@@ -67,17 +83,73 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
     return { 
       cleanContent: cleanLines.join("\n").trim(), 
       logs, 
-      updates 
+      updates,
+      activeFile: currentFile
     };
-  }, [content, isAi]);
+  }, [displayContent, isAi]);
 
+  // AUTO-CONTINUATION DETECTOR: If stream dies but file is not completed
+  useEffect(() => {
+    if (isAi && !isStreaming && parsedData.activeFile && onTruncate) {
+      if (!hasTriggeredTruncate.current) {
+        hasTriggeredTruncate.current = true;
+        onTruncate(parsedData.activeFile);
+      }
+    }
+  }, [isStreaming, parsedData.activeFile, isAi, onTruncate]);
+
+  // STALL DETECTOR QUEUE: Watch for stream hangs or heavy processing delays
+  useEffect(() => {
+    if (!isCurrentlyStreaming) {
+      setIsStalled(false);
+      return;
+    }
+    
+    setIsStalled(false); 
+
+    const stallTimer = setTimeout(() => {
+      setIsStalled(true);
+    }, 8000);
+
+    return () => clearTimeout(stallTimer);
+  }, [displayContent, isCurrentlyStreaming]);
+
+  // LABOR ILLUSION QUEUE: Dynamic weight-based delay
+  useEffect(() => {
+    if (isAi && parsedData.logs.length > visibleLogCount) {
+      let delay = 2000; 
+
+      if (visibleLogCount > 0) {
+        const prevLog = parsedData.logs[visibleLogCount - 1];
+        const isHeavyWork = prevLog.title.toLowerCase().match(/implement|architect|refin/);
+        delay = isHeavyWork ? Math.floor(Math.random() * 5000) + 5000 : 2000;
+      }
+
+      const timer = setTimeout(() => {
+        setVisibleLogCount((prev) => prev + 1);
+      }, delay);
+
+      return () => clearTimeout(timer);
+    }
+  }, [parsedData.logs.length, visibleLogCount, isAi]);
+
+  // DB SYNCHRONIZATION
   useEffect(() => {
     if (isAi && parsedData.updates.length > 0 && projectId) {
       parsedData.updates.forEach((update) => {
-        updateFile(projectId, update.fileName, update.content);
+        if (!processedFiles.current.has(update.fileName)) {
+          updateFile(projectId, update.fileName, update.content);
+          processedFiles.current.add(update.fileName);
+        }
       });
     }
   }, [parsedData.updates, isAi, updateFile, projectId]);
+
+  const isThinking = isCurrentlyStreaming && displayContent.length < 15 && parsedData.logs.length === 0;
+
+  const activeLogTitle = visibleLogCount > 0 && parsedData.logs[visibleLogCount - 1] 
+    ? (isStalled ? "Processing Heavy Logic" : parsedData.logs[visibleLogCount - 1].title)
+    : "Executing Protocol";
 
   return (
     <div className={cn("flex w-full gap-3 mb-6", role === "user" ? "justify-end" : "justify-start")}>
@@ -87,15 +159,39 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
         </div>
       )}
 
-      {/* FIXED: Enforce w-full and a max-width to keep accordions consistent */}
       <div className={cn(
         "relative flex flex-col gap-2 w-full max-w-[90%]", 
         role === "user" ? "items-end" : "items-start"
       )}>
 
-        {parsedData.logs.map((log, index) => {
-           const isLast = index === parsedData.logs.length - 1;
-           const isWorking = isLast && !log.isComplete;
+        {/* GEMINI-STYLE SHIMMER ANIMATION */}
+        {isThinking && (
+          <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-zinc-900 to-indigo-900/10 border border-white/5 rounded-lg w-fit animate-pulse">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300">
+              Analyzing Request...
+            </span>
+          </div>
+        )}
+
+        {/* HOISTED: CLEAN CONVERSATIONAL TEXT NOW APPEARS ABOVE ACCORDIONS */}
+        {(parsedData.cleanContent || role === "user") && !isThinking && (
+          <div className={cn(
+            "rounded-2xl p-4 text-sm leading-relaxed shadow-sm break-words",
+            role === "user" 
+              ? "bg-white text-black rounded-tr-sm" 
+              : "bg-zinc-900 text-zinc-300 rounded-tl-sm border border-white/5 mb-2"
+          )}>
+            <div className="prose prose-invert prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 max-w-none">
+              <ReactMarkdown>{parsedData.cleanContent}</ReactMarkdown>
+            </div>
+          </div>
+        )}
+
+        {/* STAGGERED ACCORDION LOGS */}
+        {parsedData.logs.slice(0, visibleLogCount).map((log, index) => {
+           const isLastVisible = index === visibleLogCount - 1;
+           const isWorking = isLastVisible && (!log.isComplete || visibleLogCount < parsedData.logs.length);
            const isOpen = userToggled[index] !== undefined ? userToggled[index] : isWorking;
 
            return (
@@ -105,16 +201,16 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
                 className="w-full flex items-center justify-between p-3.5 hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center gap-3 overflow-hidden">
-                  {isWorking ? (
-                    <Loader className="w-3 h-3 text-blue-400 animate-spin shrink-0" />
+                  {isWorking && isCurrentlyStreaming ? (
+                    <Loader className={cn("w-3 h-3 animate-spin shrink-0", isStalled ? "text-amber-400" : "text-blue-400")} />
                   ) : (
                     <Check className="w-3 h-3 text-green-500 shrink-0" />
                   )}
                   <span className={cn(
                     "text-[10px] font-mono uppercase tracking-widest truncate",
-                    isWorking ? "text-blue-400" : "text-zinc-400"
+                    isWorking && isCurrentlyStreaming ? (isStalled ? "text-amber-400" : "text-blue-400") : "text-zinc-400"
                   )}>
-                    {log.title}
+                    {isWorking && isCurrentlyStreaming && isStalled ? "Still working on the codes, hold on..." : log.title}
                   </span>
                 </div>
                 <ChevronDown className={cn(
@@ -132,6 +228,18 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
           );
         })}
 
+        {/* DYNAMIC WRITING CODE CURSOR */}
+        {parsedData.activeFile && isCurrentlyStreaming && (
+           <div className="flex items-center gap-2 p-3 mt-1 bg-gradient-to-r from-black/60 to-indigo-900/10 border border-indigo-500/20 rounded-lg w-fit shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+             <Terminal className={cn("w-3.5 h-3.5", isStalled ? "text-amber-400" : "text-indigo-400")} />
+             <span className={cn("text-[10px] font-mono tracking-wider", isStalled ? "text-amber-300" : "text-indigo-300")}>
+               {activeLogTitle} <span className="text-white opacity-70">({parsedData.activeFile})</span>
+             </span>
+             <div className={cn("w-1.5 h-3 ml-1 animate-[ping_1s_steps(1)_infinite]", isStalled ? "bg-amber-400" : "bg-indigo-400")} />
+           </div>
+        )}
+
+        {/* COMPLETED FILE BADGES */}
         {parsedData.updates.length > 0 && (
           <div className="flex flex-wrap gap-2 my-1">
             {parsedData.updates.map((update, i) => (
@@ -142,19 +250,6 @@ export const MessageBubble = ({ role, content }: MessageBubbleProps) => {
                 </span>
               </div>
             ))}
-          </div>
-        )}
-
-        {(parsedData.cleanContent || role === "user") && (
-          <div className={cn(
-            "rounded-2xl p-4 text-sm leading-relaxed shadow-sm break-words",
-            role === "user" 
-              ? "bg-white text-black rounded-tr-sm" 
-              : "bg-zinc-900 text-zinc-300 rounded-tl-sm border border-white/5"
-          )}>
-            <div className="prose prose-invert prose-p:leading-relaxed prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 max-w-none">
-              <ReactMarkdown>{parsedData.cleanContent}</ReactMarkdown>
-            </div>
           </div>
         )}
       </div>
